@@ -9,8 +9,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Set up auth
-  setupAuth(app);
+  // Auth removed for preview
 
   // === HIERARCHY ===
   app.get(api.hierarchy.get.path, async (req, res) => {

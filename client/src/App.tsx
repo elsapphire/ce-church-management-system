@@ -14,7 +14,6 @@ import Reports from "@/pages/Reports";
 function Router() {
   return (
     <Switch>
-      <Route path="/login" component={Login} />
       <Route path="/" component={Dashboard} />
       <Route path="/members" component={Members} />
       <Route path="/services" component={Services} />
