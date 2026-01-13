@@ -1,0 +1,247 @@
+Role: You are a senior full-stack engineer and systems architect building a church attendance monitoring platform.
+
+📛 Project Name
+
+CE Attendance System
+
+🏛 Organisation
+
+Church Name: Christ Embassy Abuja Zone 1
+
+Initial Group: Immanent in Wisdom 1 Group
+
+Initial PCF: Prolific PCF
+
+Structure:
+
+Church
+ └── Group
+      └── PCF
+           └── Cell Group
+                └── Members
+
+🎯 Core Objective
+
+Build a web-based attendance monitoring system that:
+
+Registers all church members
+
+Organises them by Group → PCF → Cell
+
+Tracks attendance per service
+
+Supports fingerprint attendance (future-ready)
+
+Allows manual and QR-based attendance as fallback
+
+Produces leadership-ready reports
+
+🧱 Tech Stack (use defaults if unspecified)
+
+Backend: Python (FastAPI)
+
+Database: PostgreSQL
+
+ORM: SQLAlchemy
+
+Auth: Role-based access control (RBAC)
+
+Frontend: Simple admin dashboard (HTML + Tailwind or React)
+
+Deployment-ready (env vars, migrations, seed data)
+
+🧩 Core Modules to Build
+1. Organisation Setup
+
+Church table (single tenant for now)
+
+Groups
+
+PCFs
+
+Cell Groups
+
+Seed initial data:
+
+Church: Christ Embassy Abuja Zone 1
+
+Group: Immanent in Wisdom 1 Group
+
+PCF: Prolific PCF
+
+2. Member Management
+
+Each member must have:
+
+Full name
+
+Phone number
+
+Gender
+
+Photo (optional)
+
+Unique Member ID (auto-generated)
+
+Group → PCF → Cell assignment
+
+Status (Active / Inactive)
+
+Biometric template field (nullable, for future fingerprint use)
+
+⚠️ Do not store raw fingerprint images.
+
+3. Services
+
+Create a Service entity:
+
+Service name (e.g. Sunday Service, Midweek Service)
+
+Date
+
+Start time
+
+End time
+
+Attendance window
+
+Active flag
+
+4. Attendance System
+
+Attendance records must include:
+
+Member ID
+
+Service ID
+
+Check-in time
+
+Method:
+
+fingerprint
+
+qr_code
+
+manual
+
+Check-in device/location
+
+Prevent duplicate attendance per service
+
+5. Roles & Permissions
+
+Implement RBAC:
+
+Role	Permissions
+Admin	Full system access
+Group Leader	View group-wide reports
+PCF Leader	View PCF + cell attendance
+Cell Leader	Manual attendance for own cell
+Usher	Attendance check-in only
+6. Reporting Dashboard
+
+Build endpoints + basic UI for:
+
+Attendance by service
+
+Attendance by cell
+
+Attendance by PCF
+
+Attendance by group
+
+Absentees per service
+
+Weekly & monthly trends
+
+Focus on clarity, not fancy visuals.
+
+7. Fingerprint Integration (Future-Ready)
+
+Do NOT implement fingerprint hardware now.
+
+Instead:
+
+Create a biometric_template column
+
+Abstract attendance check-in so fingerprint devices can later POST:
+
+member_id
+service_id
+timestamp
+device_id
+
+8. API Requirements
+
+RESTful endpoints
+
+Input validation
+
+Clear error handling
+
+Swagger/OpenAPI documentation enabled
+
+9. Database Requirements
+
+Proper foreign keys
+
+Index attendance queries
+
+Soft deletes where appropriate
+
+Migration support
+
+10. Seed Data
+
+Seed the system with:
+
+Christ Embassy Abuja Zone 1
+
+Immanent in Wisdom 1 Group
+
+Prolific PCF
+
+At least 3 sample cells
+
+10 sample members
+
+🧪 Deliverables
+
+Clean project structure
+
+Well-commented code
+
+README with:
+
+Setup instructions
+
+Roles explanation
+
+How fingerprint can be added later
+
+Sample API calls
+
+🚦Non-goals (Do NOT build now)
+
+Mobile app
+
+Visitor management
+
+Payment or giving
+
+Facial recognition
+
+Multi-church tenancy
+
+⭐ Quality Bar
+
+This system should be:
+
+Scalable
+
+Secure
+
+Easy for non-technical church admins
+
+Ready for biometric expansion without refactor
