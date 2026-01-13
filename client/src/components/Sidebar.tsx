@@ -1,0 +1,77 @@
+import { Link, useLocation } from "wouter";
+import { cn } from "@/lib/utils";
+import { 
+  LayoutDashboard, 
+  Users, 
+  Calendar, 
+  ClipboardCheck, 
+  BarChart3, 
+  Settings,
+  LogOut,
+  Church
+} from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { Button } from "@/components/ui/button";
+
+const navItems = [
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/members", label: "Members", icon: Users },
+  { href: "/services", label: "Services", icon: Calendar },
+  { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
+  { href: "/reports", label: "Reports", icon: BarChart3 },
+];
+
+export function Sidebar() {
+  const [location] = useLocation();
+  const { logout, user } = useAuth();
+
+  return (
+    <div className="flex flex-col h-full w-64 bg-card border-r border-border shadow-sm">
+      <div className="p-6 border-b border-border/50">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-primary/10 rounded-lg">
+            <Church className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h1 className="font-display font-bold text-xl leading-none">CE Portal</h1>
+            <p className="text-xs text-muted-foreground mt-1">Attendance System</p>
+          </div>
+        </div>
+      </div>
+
+      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+        {navItems.map((item) => (
+          <Link key={item.href} href={item.href} className={cn(
+            "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
+            location === item.href 
+              ? "bg-primary text-primary-foreground shadow-md shadow-primary/25" 
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}>
+              <item.icon className="w-5 h-5" />
+              {item.label}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="p-4 border-t border-border/50 bg-muted/20">
+        <div className="flex items-center gap-3 mb-4 px-2">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+            {user?.firstName?.[0] || 'U'}
+          </div>
+          <div className="overflow-hidden">
+            <p className="text-sm font-semibold truncate">{user?.firstName} {user?.lastName}</p>
+            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+          </div>
+        </div>
+        <Button 
+          variant="outline" 
+          className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
+          onClick={() => logout()}
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </Button>
+      </div>
+    </div>
+  );
+}
