@@ -125,6 +125,22 @@ export async function registerRoutes(
     res.json(stats);
   });
 
+  // === ADMIN / STRUCTURE ===
+  app.post("/api/admin/groups", async (req, res) => {
+    const group = await storage.createGroup(req.body);
+    res.status(201).json(group);
+  });
+
+  app.post("/api/admin/pcfs", async (req, res) => {
+    const pcf = await storage.createPcf(req.body);
+    res.status(201).json(pcf);
+  });
+
+  app.post("/api/admin/cells", async (req, res) => {
+    const cell = await storage.createCell(req.body);
+    res.status(201).json(cell);
+  });
+
   // === SEED DATA ===
   await seedData();
 

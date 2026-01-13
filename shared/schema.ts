@@ -109,13 +109,16 @@ export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 export const insertMemberSchema = createInsertSchema(members).omit({ id: true, createdAt: true });
 export const insertServiceSchema = createInsertSchema(services).omit({ id: true, createdAt: true });
 export const insertAttendanceSchema = createInsertSchema(attendanceRecords).omit({ id: true, checkInTime: true });
-
-// For Users, we rely on Replit Auth, but if we need a schema for updating roles:
-export const insertUserSchema = createInsertSchema(users).pick({ role: true, username: true });
+export const insertGroupSchema = createInsertSchema(groups).omit({ id: true });
+export const insertPcfSchema = createInsertSchema(pcfs).omit({ id: true });
+export const insertCellSchema = createInsertSchema(cells).omit({ id: true });
 
 export type InsertMember = z.infer<typeof insertMemberSchema>;
 export type InsertService = z.infer<typeof insertServiceSchema>;
 export type InsertAttendance = z.infer<typeof insertAttendanceSchema>;
+export type InsertGroup = z.infer<typeof insertGroupSchema>;
+export type InsertPcf = z.infer<typeof insertPcfSchema>;
+export type InsertCell = z.infer<typeof insertCellSchema>;
 
 // === REPORT TYPES ===
 export type AttendanceStats = {

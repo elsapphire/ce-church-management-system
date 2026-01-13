@@ -8,7 +8,8 @@ import {
   BarChart3, 
   Settings,
   LogOut,
-  Church
+  Church,
+  Network
 } from "lucide-react";
 import logoUrl from "@assets/ce-logo-removebg-preview_1768304044152.png";
 import { useAuth } from "@/hooks/use-auth";
@@ -20,6 +21,7 @@ const navItems = [
   { href: "/services", label: "Services", icon: Calendar },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: BarChart3 },
+  { href: "/structure", label: "Structure", icon: Network },
 ];
 
 export function Sidebar() {

@@ -160,6 +160,34 @@ export const api = {
       },
     },
   },
+
+  // === ADMIN / STRUCTURE ===
+  admin: {
+    groups: {
+      create: {
+        method: 'POST' as const,
+        path: '/api/admin/groups',
+        input: z.object({ name: z.string(), churchId: z.number() }),
+        responses: { 201: z.any() },
+      },
+    },
+    pcfs: {
+      create: {
+        method: 'POST' as const,
+        path: '/api/admin/pcfs',
+        input: z.object({ name: z.string(), groupId: z.number() }),
+        responses: { 201: z.any() },
+      },
+    },
+    cells: {
+      create: {
+        method: 'POST' as const,
+        path: '/api/admin/cells',
+        input: z.object({ name: z.string(), pcfId: z.number() }),
+        responses: { 201: z.any() },
+      },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {
