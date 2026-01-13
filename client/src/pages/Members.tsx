@@ -29,29 +29,103 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 
 export default function Members() {
   const [search, setSearch] = useState("");
-  const { data: members, isLoading } = useMembers({ search });
+  const [groupId, setGroupId] = useState<string>("all");
+  const [pcfId, setPcfId] = useState<string>("all");
+  const [cellId, setCellId] = useState<string>("all");
+  
+  const { data: members, isLoading } = useMembers({ 
+    search, 
+    cellId: cellId !== "all" ? Number(cellId) : undefined 
+  });
+  const { data: hierarchy } = useHierarchy();
   const { mutate: deleteMember } = useDeleteMember();
+
+  // Filter logic for cascading selects
+  const filteredPcfs = hierarchy?.pcfs.filter(p => groupId === "all" || p.groupId === Number(groupId)) || [];
+  const filteredCells = hierarchy?.cells.filter(c => {
+    const pcfMatch = pcfId === "all" || c.pcfId === Number(pcfId);
+    const groupMatch = groupId === "all" || hierarchy.pcfs.find(p => p.id === c.pcfId)?.groupId === Number(groupId);
+    return pcfMatch && groupMatch;
+  }) || [];
+
+  // Frontend filtering since backend only supports search and cellId
+  const filteredMembers = members?.filter(member => {
+    if (cellId !== "all" && member.cellId !== Number(cellId)) return false;
+    if (pcfId !== "all") {
+      const cell = hierarchy?.cells.find(c => c.id === member.cellId);
+      if (cell?.pcfId !== Number(pcfId)) return false;
+    }
+    if (groupId !== "all") {
+      const cell = hierarchy?.cells.find(c => c.id === member.cellId);
+      const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
+      if (pcf?.groupId !== Number(groupId)) return false;
+    }
+    return true;
+  });
   
   return (
     <Layout>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold font-display">Members</h1>
+          <h1 className="text-3xl font-bold font-display tracking-tight">Members</h1>
           <p className="text-muted-foreground">Manage directory and member details.</p>
         </div>
         <AddMemberDialog />
       </div>
 
-      <div className="flex items-center gap-2 max-w-sm">
-        <div className="relative flex-1">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="relative">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name..."
+            placeholder="Search name..."
             className="pl-9 bg-card"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+
+        <Select value={groupId} onValueChange={(val) => {
+          setGroupId(val);
+          setPcfId("all");
+          setCellId("all");
+        }}>
+          <SelectTrigger className="bg-card">
+            <SelectValue placeholder="All Groups" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Groups</SelectItem>
+            {hierarchy?.groups.map(g => (
+              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={pcfId} onValueChange={(val) => {
+          setPcfId(val);
+          setCellId("all");
+        }}>
+          <SelectTrigger className="bg-card">
+            <SelectValue placeholder="All PCFs" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All PCFs</SelectItem>
+            {filteredPcfs.map(p => (
+              <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={cellId} onValueChange={setCellId}>
+          <SelectTrigger className="bg-card">
+            <SelectValue placeholder="All Cells" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Cells</SelectItem>
+            {filteredCells.map(c => (
+              <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
@@ -71,53 +145,63 @@ export default function Members() {
                 <tr>
                   <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">Loading members...</td>
                 </tr>
-              ) : members?.length === 0 ? (
+              ) : filteredMembers?.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No members found.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">No members found matching filters.</td>
                 </tr>
               ) : (
-                members?.map((member) => (
-                  <tr key={member.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                          <UserCircle className="w-5 h-5" />
+                filteredMembers?.map((member) => {
+                  const cell = hierarchy?.cells.find(c => c.id === member.cellId);
+                  return (
+                    <tr key={member.id} className="hover:bg-muted/20 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                            <UserCircle className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-foreground">{member.fullName}</div>
+                            <div className="text-xs text-muted-foreground">{member.gender}</div>
+                          </div>
                         </div>
-                        <div>
-                          <div className="font-medium text-foreground">{member.fullName}</div>
-                          <div className="text-xs text-muted-foreground">{member.gender}</div>
+                      </td>
+                      <td className="px-6 py-4 text-muted-foreground">{member.phone || "-"}</td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          member.status === 'Active' 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
+                        }`}>
+                          {member.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="text-foreground font-medium">{cell?.name || 'Unassigned'}</span>
+                          {cell && (
+                            <span className="text-[10px] text-muted-foreground uppercase">
+                              {hierarchy?.pcfs.find(p => p.id === cell.pcfId)?.name}
+                            </span>
+                          )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">{member.phone || "-"}</td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        member.status === 'Active' 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400'
-                      }`}>
-                        {member.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-muted-foreground">
-                      {member.cellId ? `Cell ${member.cellId}` : 'Unassigned'}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-muted-foreground hover:text-destructive"
-                        onClick={() => {
-                          if (confirm('Are you sure you want to delete this member?')) {
-                            deleteMember(member.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => {
+                            if (confirm('Are you sure you want to delete this member?')) {
+                              deleteMember(member.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
