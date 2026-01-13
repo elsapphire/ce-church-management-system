@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Church } from "lucide-react";
+import logoUrl from "@assets/ce-logo-removebg-preview_1768304044152.png";
 
 export default function Login() {
   const handleLogin = () => {
@@ -15,12 +15,12 @@ export default function Login() {
 
       <Card className="w-full max-w-md border-border/50 shadow-2xl backdrop-blur-sm bg-white/80 dark:bg-black/50">
         <CardHeader className="text-center space-y-2 pb-8">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4 text-primary">
-            <Church className="w-8 h-8" />
+          <div className="mx-auto w-20 h-20 bg-primary/10 rounded-2xl flex items-center justify-center mb-4 p-2 overflow-hidden">
+            <img src={logoUrl} alt="Logo" className="w-full h-full object-contain" />
           </div>
-          <CardTitle className="text-3xl font-display font-bold">Welcome Back</CardTitle>
+          <CardTitle className="text-3xl font-display font-bold text-foreground">Welcome Back</CardTitle>
           <CardDescription className="text-base">
-            Sign in to access the CE Attendance Portal
+            Sign in to access the Abuja Zone 1 portal
           </CardDescription>
         </CardHeader>
         <CardContent>

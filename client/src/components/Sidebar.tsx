@@ -10,6 +10,7 @@ import {
   LogOut,
   Church
 } from "lucide-react";
+import logoUrl from "@assets/ce-logo-removebg-preview_1768304044152.png";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 
@@ -29,12 +30,12 @@ export function Sidebar() {
     <div className="flex flex-col h-full w-64 bg-card border-r border-border shadow-sm">
       <div className="p-6 border-b border-border/50">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-primary/10 rounded-lg">
-            <Church className="w-6 h-6 text-primary" />
+          <div className="p-1.5 bg-primary/10 rounded-lg overflow-hidden flex items-center justify-center">
+            <img src={logoUrl} alt="Logo" className="w-8 h-8 object-contain" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-xl leading-none">CE Portal</h1>
-            <p className="text-xs text-muted-foreground mt-1">Attendance System</p>
+            <h1 className="font-display font-bold text-lg leading-tight">Abuja Zone 1</h1>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Attendance System</p>
           </div>
         </div>
       </div>
