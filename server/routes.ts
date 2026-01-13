@@ -128,6 +128,17 @@ export async function registerRoutes(
   // === SEED DATA ===
   await seedData();
 
+  // Mock user for frontend
+  app.get("/api/auth/user", (req, res) => {
+    res.json({
+      id: "demo-user",
+      email: "demo@example.com",
+      firstName: "Demo",
+      lastName: "User",
+      profileImageUrl: null
+    });
+  });
+
   return httpServer;
 }
 
