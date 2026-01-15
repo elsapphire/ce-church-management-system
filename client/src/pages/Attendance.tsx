@@ -30,6 +30,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 const canMarkAttendance = (role?: string | null) => {
   return role === "admin" || role === "group_pastor";
@@ -52,6 +54,65 @@ export default function Attendance() {
 
   const presentCount = records?.length || 0;
   const absentCount = Math.max(0, (allMembers?.length || 0) - presentCount);
+
+  const currentService = useMemo(() => {
+    return services?.find(s => s.id === selectedServiceId);
+  }, [services, selectedServiceId]);
+
+  const absentMembers = useMemo(() => {
+    if (!allMembers || !records) return [];
+    const presentIds = new Set(records.map(r => r.memberId));
+    return allMembers.filter(m => !presentIds.has(m.id));
+  }, [allMembers, records]);
+
+  const handleExportPDF = () => {
+    if (!currentService) return;
+
+    const doc = new jsPDF();
+    const serviceDate = format(new Date(currentService.date), 'MMMM d, yyyy');
+    
+    // Header
+    doc.setFontSize(18);
+    doc.text("Attendance Report", 14, 20);
+    doc.setFontSize(12);
+    doc.text(`Service: ${currentService.name}`, 14, 30);
+    doc.text(`Date: ${serviceDate}`, 14, 37);
+    doc.text(`Summary: ${presentCount} Present, ${absentCount} Absent`, 14, 44);
+
+    // Present Table
+    doc.setFontSize(14);
+    doc.text("Present Members", 14, 55);
+    autoTable(doc, {
+      startY: 60,
+      head: [['Time', 'Member', 'Method', 'Location']],
+      body: records?.map(r => [
+        r.checkInTime ? format(new Date(r.checkInTime), 'h:mm a') : '-',
+        r.member.fullName,
+        r.method.replace('_', ' '),
+        r.location || '-'
+      ]) || [],
+      margin: { top: 60 },
+      theme: 'grid',
+      headStyles: { fillColor: [63, 81, 181] }
+    });
+
+    // Absent Table
+    const finalY = (doc as any).lastAutoTable.finalY || 60;
+    doc.text("Absent Members", 14, finalY + 15);
+    autoTable(doc, {
+      startY: finalY + 20,
+      head: [['Member', 'Phone', 'Status']],
+      body: absentMembers.map(m => [
+        m.fullName,
+        m.phone || '-',
+        m.status
+      ]),
+      theme: 'grid',
+      headStyles: { fillColor: [244, 67, 54] }
+    });
+
+    doc.save(`Attendance_${currentService.name}_${serviceDate}.pdf`);
+  };
 
   return (
     <Layout>
@@ -90,9 +151,9 @@ export default function Attendance() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => window.print()}>
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={handleExportPDF}>
                 <Printer className="h-4 w-4" />
-                Print as PDF
+                Export as PDF
               </DropdownMenuItem>
               <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => alert('Exporting to XLSX...')}>
                 <FileDown className="h-4 w-4" />
@@ -254,25 +315,25 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-5 tracking-wider">Time</th>
-              <th className="px-8 py-5 tracking-wider">Member</th>
-              <th className="px-8 py-5 tracking-wider">Method</th>
-              <th className="px-8 py-5 tracking-wider">Location</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Time</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Member</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Method</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Location</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {records?.map((record) => (
               <tr key={record.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-8 py-5 text-muted-foreground">
+                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">
                   {record.checkInTime ? format(new Date(record.checkInTime), 'h:mm a') : '-'}
                 </td>
-                <td className="px-8 py-5 font-medium">{record.member.fullName}</td>
-                <td className="px-8 py-5">
-                  <span className="capitalize px-2.5 py-1 rounded-full bg-muted text-xs font-medium">
+                <td className="px-8 py-6 font-medium whitespace-nowrap">{record.member.fullName}</td>
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <span className="capitalize px-3 py-1.5 rounded-full bg-muted text-xs font-semibold">
                     {record.method.replace('_', ' ')}
                   </span>
                 </td>
-                <td className="px-8 py-5 text-muted-foreground">{record.location || '-'}</td>
+                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">{record.location || '-'}</td>
               </tr>
             ))}
             {!records?.length && (
@@ -308,18 +369,18 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-5 tracking-wider">Member</th>
-              <th className="px-8 py-5 tracking-wider">Phone</th>
-              <th className="px-8 py-5 tracking-wider">Status</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Member</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Phone</th>
+              <th className="px-8 py-6 tracking-wider leading-6">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {absentMembers.map((member) => (
               <tr key={member.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-8 py-5 font-medium">{member.fullName}</td>
-                <td className="px-8 py-5 text-muted-foreground">{member.phone || '-'}</td>
-                <td className="px-8 py-5">
-                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                <td className="px-8 py-6 font-medium whitespace-nowrap">{member.fullName}</td>
+                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">{member.phone || '-'}</td>
+                <td className="px-8 py-6 whitespace-nowrap">
+                  <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                     member.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                   }`}>
                     {member.status}
@@ -338,6 +399,7 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
     </div>
   );
 }
+
 
 
 function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
