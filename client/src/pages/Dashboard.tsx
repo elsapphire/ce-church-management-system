@@ -32,12 +32,21 @@ export default function Dashboard() {
     <Layout>
       <div className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold font-display tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground">
-          {isAdmin ? "Overview of church growth and attendance metrics across the zone." :
-           isGroupPastor ? "Overview of your group's performance and growth." :
-           user?.role === "pcf_leader" ? "Overview of your PCF's performance." :
-           "Overview of your cell's performance."}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium text-primary">
+            {isAdmin && hierarchy?.church?.name ? `Zone: ${hierarchy.church.name}` :
+             isGroupPastor && user?.groupId ? `Group: ${hierarchy?.groups.find(g => g.id === user.groupId)?.name || 'Loading...'}` :
+             user?.role === "pcf_leader" && user?.pcfId ? `PCF: ${hierarchy?.pcfs.find(p => p.id === user.pcfId)?.name || 'Loading...'}` :
+             user?.role === "cell_leader" && user?.cellId ? `Cell: ${hierarchy?.cells.find(c => c.id === user.cellId)?.name || 'Loading...'}` :
+             null}
+          </p>
+          <p className="text-muted-foreground">
+            {isAdmin ? "Overview of church growth and attendance metrics across the zone." :
+             isGroupPastor ? "Overview of your group's performance and growth." :
+             user?.role === "pcf_leader" ? "Overview of your PCF's performance." :
+             "Overview of your cell's performance."}
+          </p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

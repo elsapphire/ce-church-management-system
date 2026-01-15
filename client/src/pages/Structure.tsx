@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Network, Layers, Home, Search, UserCircle } from "lucide-react";
@@ -141,6 +141,33 @@ export default function Structure() {
     }
     return [];
   }, [hierarchy, isAdmin, isGroupPastor, isPcfLeader, user]);
+
+  const accessibleGroupsForAdd = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isAdmin) return hierarchy.groups;
+    return []; // Only admin can add groups
+  }, [hierarchy, isAdmin]);
+
+  const accessiblePcfsForAdd = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isAdmin) return hierarchy.pcfs;
+    if (isGroupPastor && user?.groupId) {
+      return hierarchy.pcfs.filter(p => p.groupId === user.groupId);
+    }
+    return [];
+  }, [hierarchy, isAdmin, isGroupPastor, user]);
+
+  useEffect(() => {
+    if (isGroupPastor && user?.groupId) {
+      setSelectedGroupId(user.groupId.toString());
+    }
+  }, [isGroupPastor, user]);
+
+  useEffect(() => {
+    if (isPcfLeader && user?.pcfId) {
+      setSelectedPcfId(user.pcfId.toString());
+    }
+  }, [isPcfLeader, user]);
 
   const handleAddGroup = async () => {
     if (!groupName || !hierarchy?.church?.id) return;
@@ -331,7 +358,11 @@ export default function Structure() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Parent Group</Label>
-                    <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+                    <Select 
+                      value={selectedGroupId} 
+                      onValueChange={setSelectedGroupId}
+                      disabled={isGroupPastor}
+                    >
                       <SelectTrigger data-testid="select-parent-group">
                         <SelectValue placeholder="Select group" />
                       </SelectTrigger>
@@ -418,7 +449,11 @@ export default function Structure() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
                     <Label>Parent PCF</Label>
-                    <Select value={selectedPcfId} onValueChange={setSelectedPcfId}>
+                    <Select 
+                      value={selectedPcfId} 
+                      onValueChange={setSelectedPcfId}
+                      disabled={isPcfLeader}
+                    >
                       <SelectTrigger data-testid="select-parent-pcf">
                         <SelectValue placeholder="Select PCF" />
                       </SelectTrigger>

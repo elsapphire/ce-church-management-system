@@ -60,8 +60,32 @@ export default function Members() {
       const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
       if (pcf?.groupId !== Number(groupId)) return false;
     }
+    const cell = hierarchy?.cells.find(c => c.id === member.cellId);
+    const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
+    const group = hierarchy?.groups.find(g => g.id === pcf?.groupId);
+
+    if (user?.role === "group_pastor" && group?.id !== user.groupId) return false;
+    if (user?.role === "pcf_leader" && pcf?.id !== user.pcfId) return false;
+    if (user?.role === "cell_leader" && cell?.id !== user.cellId) return false;
+
     return true;
   });
+
+  const accessibleCellsForAdd = useMemo(() => {
+    if (!hierarchy) return [];
+    if (user?.role === "admin") return hierarchy.cells;
+    if (user?.role === "group_pastor") {
+      const groupPcfs = hierarchy.pcfs.filter(p => p.groupId === user.groupId).map(p => p.id);
+      return hierarchy.cells.filter(c => groupPcfs.includes(c.pcfId));
+    }
+    if (user?.role === "pcf_leader") {
+      return hierarchy.cells.filter(c => c.pcfId === user.pcfId);
+    }
+    if (user?.role === "cell_leader") {
+      return hierarchy.cells.filter(c => c.id === user.cellId);
+    }
+    return [];
+  }, [hierarchy, user]);
   
   return (
     <Layout>
@@ -70,7 +94,7 @@ export default function Members() {
           <h1 className="text-3xl font-bold font-display tracking-tight">Members</h1>
           <p className="text-muted-foreground">Manage directory and member details.</p>
         </div>
-        <AddMemberDialog />
+        <AddMemberDialog accessibleCells={accessibleCellsForAdd} />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -211,10 +235,10 @@ export default function Members() {
   );
 }
 
-function AddMemberDialog() {
+function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateMember();
-  const { data: hierarchy } = useHierarchy();
+  const { user } = useAuth();
 
   const form = useForm<InsertMember>({
     resolver: zodResolver(insertMemberSchema),
@@ -224,7 +248,7 @@ function AddMemberDialog() {
       gender: "Male",
       title: "",
       status: "Active",
-      cellId: undefined,
+      cellId: user?.role === "cell_leader" ? user.cellId : undefined,
     },
   });
 
@@ -348,6 +372,7 @@ function AddMemberDialog() {
                   <Select 
                     onValueChange={(val) => field.onChange(Number(val))} 
                     value={field.value?.toString()}
+                    disabled={user?.role === "cell_leader"}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -355,7 +380,7 @@ function AddMemberDialog() {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {hierarchy?.cells.map((cell) => (
+                      {accessibleCells.map((cell) => (
                         <SelectItem key={cell.id} value={cell.id.toString()}>
                           {cell.name}
                         </SelectItem>
