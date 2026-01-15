@@ -10,7 +10,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState, useMemo } from "react";
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--muted))'];
+const COLORS = ['hsl(var(--primary))', '#ef4444']; // Primary and Red-500 for Absent
 
 export default function Dashboard() {
   const { data: hierarchy } = useHierarchy();
