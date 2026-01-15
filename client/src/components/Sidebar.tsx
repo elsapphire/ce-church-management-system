@@ -32,7 +32,7 @@ const navItems = [
   { href: "/services", label: "Services", icon: Calendar, roles: ["admin", "group_pastor"] },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "group_pastor"] },
-  { href: "/structure", label: "Structure", icon: Network, roles: ["admin"] },
+  { href: "/structure", label: "Structure", icon: Network, roles: ["admin", "group_pastor", "pcf_leader"] },
 ];
 
 export function Sidebar() {

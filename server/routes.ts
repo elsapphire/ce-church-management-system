@@ -4,8 +4,9 @@ import { setupLocalAuth, seedDummyUsers } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
-import { loadUser, requireAuth, canMarkAttendance, getAccessibleCellIds, requireRoles } from "./rbac";
+import { loadUser, requireAuth, canMarkAttendance, getAccessibleCellIds, getAccessiblePcfIds, requireRoles } from "./rbac";
 import { UserRoles } from "@shared/models/auth";
+import { pcfs, cells } from "@shared/schema";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -72,6 +73,32 @@ export async function registerRoutes(
   app.post(api.members.create.path, requireAuth, async (req, res) => {
     try {
       const input = api.members.create.input.parse(req.body);
+      const role = req.user?.role;
+      
+      // Tiered member creation permissions
+      if (role === UserRoles.ADMIN) {
+        // Admin can add members anywhere
+      } else if (role === UserRoles.GROUP_PASTOR) {
+        // Group Pastor can add members to cells in their group
+        const accessibleCellIds = await getAccessibleCellIds(req.user!);
+        if (!input.cellId || !accessibleCellIds.includes(input.cellId)) {
+          return res.status(403).json({ message: "You can only add members to cells in your group" });
+        }
+      } else if (role === UserRoles.PCF_LEADER) {
+        // PCF Leader can add members to cells in their PCF
+        const accessibleCellIds = await getAccessibleCellIds(req.user!);
+        if (!input.cellId || !accessibleCellIds.includes(input.cellId)) {
+          return res.status(403).json({ message: "You can only add members to cells in your PCF" });
+        }
+      } else if (role === UserRoles.CELL_LEADER) {
+        // Cell Leader can only add members to their own cell
+        if (input.cellId !== req.user?.cellId) {
+          return res.status(403).json({ message: "You can only add members to your own cell" });
+        }
+      } else {
+        return res.status(403).json({ message: "You do not have permission to add members" });
+      }
+      
       const member = await storage.createMember(input);
       res.status(201).json(member);
     } catch (err) {
@@ -147,28 +174,117 @@ export async function registerRoutes(
     res.json(stats);
   });
 
-  // === ADMIN / STRUCTURE (Admin only) ===
+  // === USERS (for leader selection dropdowns) ===
+  app.get("/api/users", requireAuth, async (req, res) => {
+    const allUsers = await storage.getAllUsers();
+    const safeUsers = allUsers.map(u => ({
+      id: u.id,
+      email: u.email,
+      firstName: u.firstName,
+      lastName: u.lastName,
+      title: u.title,
+      role: u.role,
+    }));
+    res.json(safeUsers);
+  });
+
+  // === STRUCTURE (Tiered permissions) ===
+  // Helper to validate leader assignment - only allow promoting users who are currently "member" role
+  // This prevents privilege escalation (e.g., reassigning another admin or existing leader)
+  async function validateLeaderAssignment(leaderId: string | undefined): Promise<{ valid: boolean; error?: string }> {
+    if (!leaderId) return { valid: true };
+    const targetUser = await storage.getUser(leaderId);
+    if (!targetUser) {
+      return { valid: false, error: "Selected leader does not exist" };
+    }
+    // Only allow promoting members to prevent privilege escalation
+    if (targetUser.role && targetUser.role !== UserRoles.MEMBER) {
+      return { valid: false, error: "Selected user already has a leadership role. Only members can be promoted to leaders." };
+    }
+    return { valid: true };
+  }
+
+  // Groups: Admin only
   app.post("/api/admin/groups", requireAuth, async (req, res) => {
     if (req.user?.role !== UserRoles.ADMIN) {
-      return res.status(403).json({ message: "Admin access required" });
+      return res.status(403).json({ message: "Only Zonal Pastor can create groups" });
     }
-    const group = await storage.createGroup(req.body);
+    const { leaderId, ...groupData } = req.body;
+    
+    // Validate leader assignment
+    const leaderValidation = await validateLeaderAssignment(leaderId);
+    if (!leaderValidation.valid) {
+      return res.status(400).json({ message: leaderValidation.error });
+    }
+    
+    const group = await storage.createGroup({ ...groupData, leaderId });
+    if (leaderId) {
+      await storage.updateUser(leaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+    }
     res.status(201).json(group);
   });
 
+  // PCFs: Admin or Group Pastor (within their group)
   app.post("/api/admin/pcfs", requireAuth, async (req, res) => {
-    if (req.user?.role !== UserRoles.ADMIN) {
-      return res.status(403).json({ message: "Admin access required" });
+    const role = req.user?.role;
+    const { leaderId, groupId, ...pcfData } = req.body;
+    
+    if (role === UserRoles.ADMIN) {
+      // Admin can create anywhere
+    } else if (role === UserRoles.GROUP_PASTOR) {
+      // Group Pastor can only create PCFs in their own group
+      if (req.user?.groupId !== groupId) {
+        return res.status(403).json({ message: "You can only create PCFs in your own group" });
+      }
+    } else {
+      return res.status(403).json({ message: "You do not have permission to create PCFs" });
     }
-    const pcf = await storage.createPcf(req.body);
+    
+    // Validate leader assignment
+    const leaderValidation = await validateLeaderAssignment(leaderId);
+    if (!leaderValidation.valid) {
+      return res.status(400).json({ message: leaderValidation.error });
+    }
+    
+    const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId });
+    if (leaderId) {
+      await storage.updateUser(leaderId, { role: UserRoles.PCF_LEADER, pcfId: pcf.id, groupId });
+    }
     res.status(201).json(pcf);
   });
 
+  // Cells: Admin, Group Pastor (in their group), PCF Leader (in their PCF)
   app.post("/api/admin/cells", requireAuth, async (req, res) => {
-    if (req.user?.role !== UserRoles.ADMIN) {
-      return res.status(403).json({ message: "Admin access required" });
+    const role = req.user?.role;
+    const { leaderId, pcfId, ...cellData } = req.body;
+    
+    if (role === UserRoles.ADMIN) {
+      // Admin can create anywhere
+    } else if (role === UserRoles.GROUP_PASTOR) {
+      // Group Pastor can create cells in PCFs that belong to their group
+      const accessiblePcfIds = await getAccessiblePcfIds(req.user!);
+      if (!accessiblePcfIds.includes(pcfId)) {
+        return res.status(403).json({ message: "You can only create cells in PCFs within your group" });
+      }
+    } else if (role === UserRoles.PCF_LEADER) {
+      // PCF Leader can only create cells in their own PCF
+      if (req.user?.pcfId !== pcfId) {
+        return res.status(403).json({ message: "You can only create cells in your own PCF" });
+      }
+    } else {
+      return res.status(403).json({ message: "You do not have permission to create cells" });
     }
-    const cell = await storage.createCell(req.body);
+    
+    // Validate leader assignment
+    const leaderValidation = await validateLeaderAssignment(leaderId);
+    if (!leaderValidation.valid) {
+      return res.status(400).json({ message: leaderValidation.error });
+    }
+    
+    const cell = await storage.createCell({ ...cellData, pcfId, leaderId });
+    if (leaderId) {
+      await storage.updateUser(leaderId, { role: UserRoles.CELL_LEADER, cellId: cell.id, pcfId });
+    }
     res.status(201).json(cell);
   });
 

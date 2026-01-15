@@ -13,6 +13,8 @@ export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsers(): Promise<User[]>;
+  updateUser(id: string, updates: Partial<User>): Promise<User>;
   
   // Hierarchy
   getChurch(): Promise<Church | undefined>;
@@ -53,6 +55,15 @@ export class DatabaseStorage implements IStorage {
   async getUserByEmail(email: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.email, email));
     return user;
+  }
+
+  async getAllUsers(): Promise<User[]> {
+    return db.select().from(users);
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User> {
+    const [updated] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+    return updated;
   }
 
   // Hierarchy

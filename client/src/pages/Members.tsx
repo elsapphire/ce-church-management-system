@@ -1,6 +1,7 @@
 import { Layout } from "@/components/Layout";
 import { useMembers, useCreateMember, useDeleteMember } from "@/hooks/use-members";
 import { useHierarchy } from "@/hooks/use-hierarchy";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,8 +24,7 @@ import { Plus, Search, Trash2, UserCircle } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMemberSchema } from "@shared/schema";
-import type { InsertMember } from "@shared/routes";
+import { insertMemberSchema, type InsertMember } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 export default function Members() {
@@ -222,6 +222,7 @@ function AddMemberDialog() {
       fullName: "",
       phone: "",
       gender: "Male",
+      title: "",
       status: "Active",
       cellId: undefined,
     },
@@ -272,6 +273,20 @@ function AddMemberDialog() {
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
                     <Input placeholder="+1234567890" {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g. Brother, Sister, Pastor" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

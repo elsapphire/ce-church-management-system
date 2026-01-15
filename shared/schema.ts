@@ -18,18 +18,21 @@ export const groups = pgTable("groups", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   churchId: integer("church_id").references(() => churches.id).notNull(),
+  leaderId: varchar("leader_id"),
 });
 
 export const pcfs = pgTable("pcfs", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   groupId: integer("group_id").references(() => groups.id).notNull(),
+  leaderId: varchar("leader_id"),
 });
 
 export const cells = pgTable("cells", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   pcfId: integer("pcf_id").references(() => pcfs.id).notNull(),
+  leaderId: varchar("leader_id"),
 });
 
 // === MEMBERS ===
@@ -38,6 +41,7 @@ export const members = pgTable("members", {
   fullName: text("full_name").notNull(),
   phone: text("phone"),
   gender: text("gender"), // Male, Female
+  title: text("title"),
   photoUrl: text("photo_url"),
   status: text("status").default("Active"), // Active, Inactive
   biometricTemplate: text("biometric_template"), // Future use

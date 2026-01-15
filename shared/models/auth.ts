@@ -34,6 +34,7 @@ export const users = pgTable("users", {
   username: varchar("username"),
   password: varchar("password"),
   role: varchar("role").default("member"),
+  title: varchar("title"),
   profileImageUrl: varchar("profile_image_url"),
   churchId: integer("church_id"),
   groupId: integer("group_id"),
