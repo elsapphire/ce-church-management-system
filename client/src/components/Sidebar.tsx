@@ -29,15 +29,19 @@ const getRoleLabel = (role?: string | null) => {
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/members", label: "Members", icon: Users },
-  { href: "/services", label: "Services", icon: Calendar },
+  { href: "/services", label: "Services", icon: Calendar, roles: ["admin", "group_pastor"] },
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
-  { href: "/reports", label: "Reports", icon: BarChart3 },
-  { href: "/structure", label: "Structure", icon: Network },
+  { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "group_pastor"] },
+  { href: "/structure", label: "Structure", icon: Network, roles: ["admin"] },
 ];
 
 export function Sidebar() {
   const [location] = useLocation();
   const { logout, user } = useAuth();
+
+  const filteredNavItems = navItems.filter(item => 
+    !item.roles || (user?.role && item.roles.includes(user.role))
+  );
 
   return (
     <div className="flex flex-col h-full w-64 bg-card border-r border-border shadow-sm">
@@ -54,7 +58,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <Link key={item.href} href={item.href} className={cn(
             "flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200",
             location === item.href 

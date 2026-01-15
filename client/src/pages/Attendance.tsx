@@ -103,7 +103,7 @@ export default function Attendance() {
           <CardContent className="flex items-center gap-3 py-4">
             <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
             <p className="text-sm text-amber-700 dark:text-amber-300">
-              Marking attendance is only available for Zonal Pastors and Group Pastors.
+              Only Zonal Pastors and Group Pastors can record attendance.
             </p>
           </CardContent>
         </Card>
@@ -230,6 +230,7 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
 
 function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
   const { data: stats } = useAttendanceStats(serviceId);
+  const { user } = useAuth();
   
   if (!stats?.[0]) return <p>No stats available.</p>;
   
@@ -244,9 +245,11 @@ function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
     value
   }));
 
+  const showCellBreakdown = user?.role === "admin" || user?.role === "group_pastor" || user?.role === "pcf_leader";
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <Card>
+      <Card className={!showCellBreakdown ? "md:col-span-2" : ""}>
         <CardHeader>
           <CardTitle>Check-in Methods</CardTitle>
         </CardHeader>
@@ -262,21 +265,23 @@ function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>By Cell Group</CardTitle>
-        </CardHeader>
-        <CardContent className="h-[300px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={cellData}>
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="value" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      {showCellBreakdown && (
+        <Card>
+          <CardHeader>
+            <CardTitle>By Cell Group</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cellData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

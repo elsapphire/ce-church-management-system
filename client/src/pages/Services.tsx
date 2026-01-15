@@ -21,6 +21,8 @@ import { format } from "date-fns";
 
 export default function Services() {
   const { data: services, isLoading } = useServices();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
 
   return (
     <Layout>
@@ -29,7 +31,7 @@ export default function Services() {
           <h1 className="text-3xl font-bold font-display">Services</h1>
           <p className="text-muted-foreground">Schedule and manage church services.</p>
         </div>
-        <AddServiceDialog />
+        {isAdmin && <AddServiceDialog />}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
