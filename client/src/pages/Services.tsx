@@ -14,10 +14,10 @@ import { CalendarDays, Clock, Plus } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertServiceSchema } from "@shared/schema";
-import type { InsertService } from "@shared/routes";
+import { insertServiceSchema, type InsertService } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function Services() {
   const { data: services, isLoading } = useServices();
