@@ -70,6 +70,7 @@ export function Sidebar() {
           variant="outline" 
           className="w-full justify-start gap-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 hover:border-destructive/20"
           onClick={() => logout()}
+          data-testid="button-logout"
         >
           <LogOut className="w-4 h-4" />
           Sign Out

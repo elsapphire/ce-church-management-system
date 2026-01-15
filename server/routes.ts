@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { setupAuth } from "./replit_integrations/auth"; // Created by blueprint
+import { setupLocalAuth, seedAdminUser } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
@@ -9,7 +9,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Auth removed for preview
+  setupLocalAuth(app);
+  await seedAdminUser();
 
   // === HIERARCHY ===
   app.get(api.hierarchy.get.path, async (req, res) => {
@@ -143,17 +144,6 @@ export async function registerRoutes(
 
   // === SEED DATA ===
   await seedData();
-
-  // Mock user for frontend
-  app.get("/api/auth/user", (req, res) => {
-    res.json({
-      id: "demo-user",
-      email: "demo@example.com",
-      firstName: "Demo",
-      lastName: "User",
-      profileImageUrl: null
-    });
-  });
 
   return httpServer;
 }

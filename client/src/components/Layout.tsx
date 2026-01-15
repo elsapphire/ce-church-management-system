@@ -1,6 +1,7 @@
 import { Sidebar } from "./Sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { Loader2 } from "lucide-react";
+import { Redirect } from "wouter";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,10 +19,7 @@ export function Layout({ children }: LayoutProps) {
   }
 
   if (!isAuthenticated) {
-    // Redirect logic is typically handled in the page or app router, 
-    // but here we can show a placeholder or login prompt.
-    window.location.href = "/login";
-    return null;
+    return <Redirect to="/login" />;
   }
 
   return (
