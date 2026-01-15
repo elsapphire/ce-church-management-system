@@ -28,10 +28,16 @@ import { insertMemberSchema, type InsertMember } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 export default function Members() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
+  const isGroupPastor = user?.role === "group_pastor";
+  const isPcfLeader = user?.role === "pcf_leader";
+  const isCellLeader = user?.role === "cell_leader";
+
   const [search, setSearch] = useState("");
-  const [groupId, setGroupId] = useState<string>("all");
-  const [pcfId, setPcfId] = useState<string>("all");
-  const [cellId, setCellId] = useState<string>("all");
+  const [groupId, setGroupId] = useState<string>(isGroupPastor ? user?.groupId?.toString() || "all" : "all");
+  const [pcfId, setPcfId] = useState<string>(isPcfLeader ? user?.pcfId?.toString() || "all" : "all");
+  const [cellId, setCellId] = useState<string>(isCellLeader ? user?.cellId?.toString() || "all" : "all");
   
   const { data: members, isLoading } = useMembers({ 
     search, 
@@ -39,54 +45,59 @@ export default function Members() {
   });
   const { data: hierarchy } = useHierarchy();
   const { mutate: deleteMember } = useDeleteMember();
-  const { user } = useAuth();
 
   // Filter logic for cascading selects
-  const filteredPcfs = hierarchy?.pcfs.filter(p => groupId === "all" || p.groupId === Number(groupId)) || [];
-  const filteredCells = hierarchy?.cells.filter(c => {
-    const pcfMatch = pcfId === "all" || c.pcfId === Number(pcfId);
-    const groupMatch = groupId === "all" || hierarchy.pcfs.find(p => p.id === c.pcfId)?.groupId === Number(groupId);
-    return pcfMatch && groupMatch;
-  }) || [];
+  const filteredPcfs = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isAdmin) return groupId === "all" ? hierarchy.pcfs : hierarchy.pcfs.filter(p => p.groupId === Number(groupId));
+    if (isGroupPastor) return hierarchy.pcfs.filter(p => p.groupId === user?.groupId);
+    if (isPcfLeader) return hierarchy.pcfs.filter(p => p.id === user?.pcfId);
+    return [];
+  }, [hierarchy, groupId, isAdmin, isGroupPastor, isPcfLeader, user]);
+
+  const filteredCells = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isAdmin || isGroupPastor) {
+      const parentPcfIds = filteredPcfs.map(p => p.id);
+      return hierarchy.cells.filter(c => {
+        const pcfMatch = pcfId === "all" ? parentPcfIds.includes(c.pcfId) : c.pcfId === Number(pcfId);
+        return pcfMatch;
+      });
+    }
+    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user?.pcfId);
+    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user?.cellId);
+    return [];
+  }, [hierarchy, pcfId, filteredPcfs, isAdmin, isGroupPastor, isPcfLeader, isCellLeader, user]);
 
   // Frontend filtering since backend only supports search and cellId
   const filteredMembers = members?.filter(member => {
-    if (cellId !== "all" && member.cellId !== Number(cellId)) return false;
-    if (pcfId !== "all") {
-      const cell = hierarchy?.cells.find(c => c.id === member.cellId);
-      if (cell?.pcfId !== Number(pcfId)) return false;
-    }
-    if (groupId !== "all") {
-      const cell = hierarchy?.cells.find(c => c.id === member.cellId);
-      const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
-      if (pcf?.groupId !== Number(groupId)) return false;
-    }
     const cell = hierarchy?.cells.find(c => c.id === member.cellId);
     const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
     const group = hierarchy?.groups.find(g => g.id === pcf?.groupId);
 
-    if (user?.role === "group_pastor" && group?.id !== user.groupId) return false;
-    if (user?.role === "pcf_leader" && pcf?.id !== user.pcfId) return false;
-    if (user?.role === "cell_leader" && cell?.id !== user.cellId) return false;
+    if (isGroupPastor && group?.id !== user?.groupId) return false;
+    if (isPcfLeader && pcf?.id !== user?.pcfId) return false;
+    if (isCellLeader && cell?.id !== user?.cellId) return false;
+
+    // Apply active filter values
+    if (cellId !== "all" && member.cellId !== Number(cellId)) return false;
+    if (pcfId !== "all" && cell?.pcfId !== Number(pcfId)) return false;
+    if (groupId !== "all" && pcf?.groupId !== Number(groupId)) return false;
 
     return true;
   });
 
   const accessibleCellsForAdd = useMemo(() => {
     if (!hierarchy) return [];
-    if (user?.role === "admin") return hierarchy.cells;
-    if (user?.role === "group_pastor") {
-      const groupPcfs = hierarchy.pcfs.filter(p => p.groupId === user.groupId).map(p => p.id);
+    if (isAdmin) return hierarchy.cells;
+    if (isGroupPastor) {
+      const groupPcfs = hierarchy.pcfs.filter(p => p.groupId === user?.groupId).map(p => p.id);
       return hierarchy.cells.filter(c => groupPcfs.includes(c.pcfId));
     }
-    if (user?.role === "pcf_leader") {
-      return hierarchy.cells.filter(c => c.pcfId === user.pcfId);
-    }
-    if (user?.role === "cell_leader") {
-      return hierarchy.cells.filter(c => c.id === user.cellId);
-    }
+    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user?.pcfId);
+    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user?.cellId);
     return [];
-  }, [hierarchy, user]);
+  }, [hierarchy, isAdmin, isGroupPastor, isPcfLeader, isCellLeader, user]);
   
   return (
     <Layout>
@@ -109,48 +120,54 @@ export default function Members() {
           />
         </div>
 
-        <Select value={groupId} onValueChange={(val) => {
-          setGroupId(val);
-          setPcfId("all");
-          setCellId("all");
-        }}>
-          <SelectTrigger className="bg-card">
-            <SelectValue placeholder="All Groups" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Groups</SelectItem>
-            {hierarchy?.groups.map(g => (
-              <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {isAdmin && (
+          <Select value={groupId} onValueChange={(val) => {
+            setGroupId(val);
+            setPcfId("all");
+            setCellId("all");
+          }}>
+            <SelectTrigger className="bg-card">
+              <SelectValue placeholder="All Groups" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Groups</SelectItem>
+              {hierarchy?.groups.map(g => (
+                <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        <Select value={pcfId} onValueChange={(val) => {
-          setPcfId(val);
-          setCellId("all");
-        }}>
-          <SelectTrigger className="bg-card">
-            <SelectValue placeholder="All PCFs" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All PCFs</SelectItem>
-            {filteredPcfs.map(p => (
-              <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {(isAdmin || isGroupPastor) && (
+          <Select value={pcfId} onValueChange={(val) => {
+            setPcfId(val);
+            setCellId("all");
+          }}>
+            <SelectTrigger className="bg-card">
+              <SelectValue placeholder="All PCFs" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All PCFs</SelectItem>
+              {filteredPcfs.map(p => (
+                <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
-        <Select value={cellId} onValueChange={setCellId}>
-          <SelectTrigger className="bg-card">
-            <SelectValue placeholder="All Cells" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Cells</SelectItem>
-            {filteredCells.map(c => (
-              <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {(isAdmin || isGroupPastor || isPcfLeader) && (
+          <Select value={cellId} onValueChange={setCellId}>
+            <SelectTrigger className="bg-card">
+              <SelectValue placeholder="All Cells" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Cells</SelectItem>
+              {filteredCells.map(c => (
+                <SelectItem key={c.id} value={c.id.toString()}>{c.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
