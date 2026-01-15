@@ -134,13 +134,13 @@ export default function Attendance() {
 
       {selectedServiceId ? (
         <Tabs defaultValue={hasMarkPermission ? "mark" : "list"} className="w-full">
-          <TabsList className={`grid w-full max-w-[500px] ${hasMarkPermission ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground gap-1">
             {hasMarkPermission && (
-              <TabsTrigger value="mark" data-testid="tab-mark">Mark Attendance</TabsTrigger>
+              <TabsTrigger value="mark" data-testid="tab-mark" className="px-4 py-2">Mark Attendance</TabsTrigger>
             )}
-            <TabsTrigger value="list" data-testid="tab-list">Members in Church</TabsTrigger>
-            <TabsTrigger value="absent" data-testid="tab-absent">Members Absent</TabsTrigger>
-            <TabsTrigger value="stats" data-testid="tab-stats">Statistics</TabsTrigger>
+            <TabsTrigger value="list" data-testid="tab-list" className="px-4 py-2">Members in Church</TabsTrigger>
+            <TabsTrigger value="absent" data-testid="tab-absent" className="px-4 py-2">Members Absent</TabsTrigger>
+            <TabsTrigger value="stats" data-testid="tab-stats" className="px-4 py-2">Statistics</TabsTrigger>
           </TabsList>
           
           <div className="mt-6">
@@ -302,30 +302,30 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Time</th>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Method</th>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Location</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Time</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Method</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Location</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {records?.map((record) => (
               <tr key={record.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">
+                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
                   {record.checkInTime ? format(new Date(record.checkInTime), 'h:mm a') : '-'}
                 </td>
-                <td className="px-8 py-6 font-medium whitespace-nowrap">{record.member.fullName}</td>
-                <td className="px-8 py-6 whitespace-nowrap">
-                  <span className="capitalize px-3 py-1.5 rounded-full bg-muted text-xs font-semibold">
+                <td className="px-4 py-3 font-medium whitespace-nowrap">{record.member.fullName}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className="capitalize px-2 py-1 rounded-full bg-muted text-[10px] font-semibold">
                     {record.method.replace('_', ' ')}
                   </span>
                 </td>
-                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">{record.location || '-'}</td>
+                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{record.location || '-'}</td>
               </tr>
             ))}
             {!records?.length && (
               <tr>
-                <td colSpan={4} className="px-8 py-12 text-center text-muted-foreground italic text-base">No attendance records yet for this service.</td>
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground italic text-sm">No attendance records yet for this service.</td>
               </tr>
             )}
           </tbody>
@@ -356,18 +356,18 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Phone</th>
-              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Status</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Phone</th>
+              <th className="px-4 py-3 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {absentMembers.map((member) => (
               <tr key={member.id} className="hover:bg-muted/30 transition-colors">
-                <td className="px-8 py-6 font-medium whitespace-nowrap">{member.fullName}</td>
-                <td className="px-8 py-6 text-muted-foreground whitespace-nowrap">{member.phone || '-'}</td>
-                <td className="px-8 py-6 whitespace-nowrap">
-                  <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                <td className="px-4 py-3 font-medium whitespace-nowrap">{member.fullName}</td>
+                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{member.phone || '-'}</td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-semibold ${
                     member.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
                   }`}>
                     {member.status}
@@ -377,7 +377,7 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
             ))}
             {absentMembers.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-8 py-12 text-center text-muted-foreground italic text-base">All members are present!</td>
+                <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground italic text-sm">All members are present!</td>
               </tr>
             )}
           </tbody>
