@@ -240,6 +240,12 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateMember();
   const { user } = useAuth();
+  const { data: hierarchy } = useHierarchy();
+
+  const isAdmin = user?.role === "admin";
+  const isGroupPastor = user?.role === "group_pastor";
+  const isPcfLeader = user?.role === "pcf_leader";
+  const isCellLeader = user?.role === "cell_leader";
 
   const form = useForm<InsertMember>({
     resolver: zodResolver(insertMemberSchema),
@@ -249,15 +255,37 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
       gender: "Male",
       title: "",
       status: "Active",
-      cellId: user?.role === "cell_leader" ? user.cellId : undefined,
+      cellId: isCellLeader ? user.cellId : undefined,
     },
   });
+
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(
+    isGroupPastor ? user.groupId?.toString() || "" : ""
+  );
+  const [selectedPcfId, setSelectedPcfId] = useState<string>(
+    isPcfLeader ? user.pcfId?.toString() || "" : ""
+  );
+
+  const filteredPcfs = useMemo(() => {
+    if (!hierarchy || !selectedGroupId) return [];
+    return hierarchy.pcfs.filter(p => p.groupId === Number(selectedGroupId));
+  }, [hierarchy, selectedGroupId]);
+
+  const filteredCells = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user.cellId);
+    if (selectedPcfId) return hierarchy.cells.filter(c => c.pcfId === Number(selectedPcfId));
+    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user.pcfId);
+    return [];
+  }, [hierarchy, selectedPcfId, isCellLeader, isPcfLeader, user]);
 
   const onSubmit = (data: InsertMember) => {
     mutate(data, {
       onSuccess: () => {
         setOpen(false);
         form.reset();
+        if (!isGroupPastor) setSelectedGroupId("");
+        if (!isPcfLeader) setSelectedPcfId("");
       },
     });
   };
@@ -276,6 +304,31 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Title</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select title" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="Pastor">Pastor</SelectItem>
+                      <SelectItem value="Deacon">Deacon</SelectItem>
+                      <SelectItem value="Deaconess">Deaconess</SelectItem>
+                      <SelectItem value="Brother">Brother</SelectItem>
+                      <SelectItem value="Sister">Sister</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="fullName"
@@ -298,20 +351,6 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                   <FormLabel>Phone</FormLabel>
                   <FormControl>
                     <Input placeholder="+1234567890" {...field} value={field.value || ''} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="title"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Title</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g. Brother, Sister, Pastor" {...field} value={field.value || ''} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -364,6 +403,49 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
               />
             </div>
 
+            {isAdmin && (
+              <div className="space-y-2">
+                <Label>Group</Label>
+                <Select value={selectedGroupId} onValueChange={(val) => {
+                  setSelectedGroupId(val);
+                  setSelectedPcfId("");
+                  form.setValue("cellId", undefined as any);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Group" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hierarchy?.groups.map(g => (
+                      <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {(isAdmin || isGroupPastor) && (
+              <div className="space-y-2">
+                <Label>PCF</Label>
+                <Select 
+                  value={selectedPcfId} 
+                  onValueChange={(val) => {
+                    setSelectedPcfId(val);
+                    form.setValue("cellId", undefined as any);
+                  }}
+                  disabled={!selectedGroupId && isAdmin}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select PCF" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredPcfs.map(p => (
+                      <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
             <FormField
               control={form.control}
               name="cellId"
@@ -373,7 +455,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                   <Select 
                     onValueChange={(val) => field.onChange(Number(val))} 
                     value={field.value?.toString()}
-                    disabled={user?.role === "cell_leader"}
+                    disabled={isCellLeader || (!selectedPcfId && (isAdmin || isGroupPastor))}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -381,7 +463,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {accessibleCells.map((cell) => (
+                      {filteredCells.map((cell) => (
                         <SelectItem key={cell.id} value={cell.id.toString()}>
                           {cell.name}
                         </SelectItem>
