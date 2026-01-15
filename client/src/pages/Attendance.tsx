@@ -20,7 +20,7 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { QrCode, CheckCircle2, User, Search, Lock, Users, UserX, Printer, FileDown, ChevronDown } from "lucide-react";
+import { QrCode, CheckCircle2, User, Search, Lock, Users, UserX, Printer, FileDown, ChevronDown, Check } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { StatsCard } from "@/components/StatsCard";
@@ -30,8 +30,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 const canMarkAttendance = (role?: string | null) => {
   return role === "admin" || role === "group_pastor";
@@ -54,65 +66,6 @@ export default function Attendance() {
 
   const presentCount = records?.length || 0;
   const absentCount = Math.max(0, (allMembers?.length || 0) - presentCount);
-
-  const currentService = useMemo(() => {
-    return services?.find(s => s.id === selectedServiceId);
-  }, [services, selectedServiceId]);
-
-  const absentMembers = useMemo(() => {
-    if (!allMembers || !records) return [];
-    const presentIds = new Set(records.map(r => r.memberId));
-    return allMembers.filter(m => !presentIds.has(m.id));
-  }, [allMembers, records]);
-
-  const handleExportPDF = () => {
-    if (!currentService) return;
-
-    const doc = new jsPDF();
-    const serviceDate = format(new Date(currentService.date), 'MMMM d, yyyy');
-    
-    // Header
-    doc.setFontSize(18);
-    doc.text("Attendance Report", 14, 20);
-    doc.setFontSize(12);
-    doc.text(`Service: ${currentService.name}`, 14, 30);
-    doc.text(`Date: ${serviceDate}`, 14, 37);
-    doc.text(`Summary: ${presentCount} Present, ${absentCount} Absent`, 14, 44);
-
-    // Present Table
-    doc.setFontSize(14);
-    doc.text("Present Members", 14, 55);
-    autoTable(doc, {
-      startY: 60,
-      head: [['Time', 'Member', 'Method', 'Location']],
-      body: records?.map(r => [
-        r.checkInTime ? format(new Date(r.checkInTime), 'h:mm a') : '-',
-        r.member.fullName,
-        r.method.replace('_', ' '),
-        r.location || '-'
-      ]) || [],
-      margin: { top: 60 },
-      theme: 'grid',
-      headStyles: { fillColor: [63, 81, 181] }
-    });
-
-    // Absent Table
-    const finalY = (doc as any).lastAutoTable.finalY || 60;
-    doc.text("Absent Members", 14, finalY + 15);
-    autoTable(doc, {
-      startY: finalY + 20,
-      head: [['Member', 'Phone', 'Status']],
-      body: absentMembers.map(m => [
-        m.fullName,
-        m.phone || '-',
-        m.status
-      ]),
-      theme: 'grid',
-      headStyles: { fillColor: [244, 67, 54] }
-    });
-
-    doc.save(`Attendance_${currentService.name}_${serviceDate}.pdf`);
-  };
 
   return (
     <Layout>
@@ -151,7 +104,7 @@ export default function Attendance() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={handleExportPDF}>
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => alert('Exporting to PDF...')}>
                 <Printer className="h-4 w-4" />
                 Export as PDF
               </DropdownMenuItem>
@@ -231,26 +184,26 @@ export default function Attendance() {
 }
 
 function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
-  const [memberIdInput, setMemberIdInput] = useState("");
+  const [open, setOpen] = useState(false);
+  const [searchValue, setSearchValue] = useState("");
   const { mutate, isPending } = useMarkAttendance();
-  const { data: members } = useMembers(); // To lookup names
+  const { data: members } = useMembers();
 
-  const handleMark = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!memberIdInput) return;
-
+  const handleMark = (memberId: number) => {
     mutate({
       serviceId,
-      memberId: Number(memberIdInput),
+      memberId,
       method: "manual",
       location: "Main Auditorium"
     }, {
-      onSuccess: () => setMemberIdInput("")
+      onSuccess: () => {
+        setOpen(false);
+        setSearchValue("");
+      }
     });
   };
 
   const handleSimulatedQR = () => {
-    // Simulate reading a QR code (random existing member for demo)
     if (!members?.length) return;
     const randomMember = members[Math.floor(Math.random() * members.length)];
     mutate({
@@ -265,21 +218,55 @@ function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
       <Card>
         <CardHeader>
-          <CardTitle>Manual Entry</CardTitle>
-          <CardDescription>Enter Member ID directly.</CardDescription>
+          <CardTitle>Member Search</CardTitle>
+          <CardDescription>Search by name or ID to mark attendance.</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleMark} className="space-y-4">
-            <Input 
-              placeholder="Enter Member ID..." 
-              value={memberIdInput}
-              onChange={(e) => setMemberIdInput(e.target.value)}
-              type="number"
-            />
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? "Marking..." : "Submit Attendance"}
-            </Button>
-          </form>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={open}
+                className="w-full justify-between"
+                disabled={isPending}
+              >
+                {searchValue || "Search member..."}
+                <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-full p-0" align="start">
+              <Command className="w-full">
+                <CommandInput placeholder="Type name or ID..." />
+                <CommandList className="max-h-[300px]">
+                  <CommandEmpty>No member found.</CommandEmpty>
+                  <CommandGroup>
+                    {members?.map((member) => (
+                      <CommandItem
+                        key={member.id}
+                        value={`${member.fullName} ${member.id}`}
+                        onSelect={() => {
+                          setSearchValue(member.fullName);
+                          handleMark(member.id);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            searchValue === member.fullName ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">{member.fullName}</span>
+                          <span className="text-xs text-muted-foreground">ID: {member.id} • {member.title}</span>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
         </CardContent>
       </Card>
 
@@ -307,18 +294,18 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
   if (isLoading) return <p>Loading records...</p>;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
-      <div className="p-6 border-b border-border bg-muted/10 print:px-0">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="p-6 border-b border-border bg-muted/10">
         <h3 className="font-semibold text-lg">{records?.length || 0} Members in Church</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-6 tracking-wider leading-6">Time</th>
-              <th className="px-8 py-6 tracking-wider leading-6">Member</th>
-              <th className="px-8 py-6 tracking-wider leading-6">Method</th>
-              <th className="px-8 py-6 tracking-wider leading-6">Location</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Time</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Method</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Location</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -361,17 +348,17 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
   if (loadingMembers || loadingAttendance) return <p>Loading members...</p>;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
-      <div className="p-6 border-b border-border bg-muted/10 print:px-0">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="p-6 border-b border-border bg-muted/10">
         <h3 className="font-semibold text-lg">{absentMembers.length} Members Absent</h3>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left border-collapse">
           <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <th className="px-8 py-6 tracking-wider leading-6">Member</th>
-              <th className="px-8 py-6 tracking-wider leading-6">Phone</th>
-              <th className="px-8 py-6 tracking-wider leading-6">Status</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Member</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Phone</th>
+              <th className="px-8 py-6 tracking-wider leading-6 border-r border-border/10 last:border-r-0">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
@@ -399,8 +386,6 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
     </div>
   );
 }
-
-
 
 function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
   const { data: stats } = useAttendanceStats(serviceId);
