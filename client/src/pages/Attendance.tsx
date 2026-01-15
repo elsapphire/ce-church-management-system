@@ -2,6 +2,7 @@ import { Layout } from "@/components/Layout";
 import { useServices } from "@/hooks/use-services";
 import { useAttendanceList, useMarkAttendance, useAttendanceStats } from "@/hooks/use-attendance";
 import { useMembers } from "@/hooks/use-members";
+import { useAuth } from "@/hooks/use-auth";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,13 +20,19 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { QrCode, CheckCircle2, User, Search } from "lucide-react";
+import { QrCode, CheckCircle2, User, Search, Lock } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 
+const canMarkAttendance = (role?: string | null) => {
+  return role === "admin" || role === "group_pastor";
+};
+
 export default function Attendance() {
   const { data: services } = useServices();
+  const { user } = useAuth();
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
+  const hasMarkPermission = canMarkAttendance(user?.role);
 
   // Default to first active service if available and none selected
   if (!selectedServiceId && services?.length) {
@@ -46,7 +53,7 @@ export default function Attendance() {
           value={selectedServiceId?.toString()} 
           onValueChange={(val) => setSelectedServiceId(Number(val))}
         >
-          <SelectTrigger>
+          <SelectTrigger data-testid="select-service">
             <SelectValue placeholder="Choose a service..." />
           </SelectTrigger>
           <SelectContent>
@@ -60,17 +67,21 @@ export default function Attendance() {
       </div>
 
       {selectedServiceId ? (
-        <Tabs defaultValue="mark" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 max-w-[400px]">
-            <TabsTrigger value="mark">Mark Attendance</TabsTrigger>
-            <TabsTrigger value="list">View List</TabsTrigger>
-            <TabsTrigger value="stats">Statistics</TabsTrigger>
+        <Tabs defaultValue={hasMarkPermission ? "mark" : "list"} className="w-full">
+          <TabsList className={`grid w-full max-w-[400px] ${hasMarkPermission ? 'grid-cols-3' : 'grid-cols-2'}`}>
+            {hasMarkPermission && (
+              <TabsTrigger value="mark" data-testid="tab-mark">Mark Attendance</TabsTrigger>
+            )}
+            <TabsTrigger value="list" data-testid="tab-list">View List</TabsTrigger>
+            <TabsTrigger value="stats" data-testid="tab-stats">Statistics</TabsTrigger>
           </TabsList>
           
           <div className="mt-6">
-            <TabsContent value="mark">
-              <MarkAttendancePanel serviceId={selectedServiceId} />
-            </TabsContent>
+            {hasMarkPermission && (
+              <TabsContent value="mark">
+                <MarkAttendancePanel serviceId={selectedServiceId} />
+              </TabsContent>
+            )}
             
             <TabsContent value="list">
               <AttendanceListPanel serviceId={selectedServiceId} />
@@ -85,6 +96,17 @@ export default function Attendance() {
         <div className="flex flex-col items-center justify-center p-12 bg-muted/20 rounded-xl border border-dashed border-border">
           <p className="text-muted-foreground">Select a service to manage attendance.</p>
         </div>
+      )}
+
+      {!hasMarkPermission && (
+        <Card className="mt-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30">
+          <CardContent className="flex items-center gap-3 py-4">
+            <Lock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">
+              Marking attendance is only available for Zonal Pastors and Group Pastors.
+            </p>
+          </CardContent>
+        </Card>
       )}
     </Layout>
   );

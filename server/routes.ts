@@ -1,19 +1,24 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { setupLocalAuth, seedAdminUser } from "./auth";
+import { setupLocalAuth, seedDummyUsers } from "./auth";
 import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
+import { loadUser, requireAuth, canMarkAttendance, getAccessibleCellIds, requireRoles } from "./rbac";
+import { UserRoles } from "@shared/models/auth";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
   setupLocalAuth(app);
-  await seedAdminUser();
+  
+  app.use(loadUser);
+  
+  await seedDummyUsers();
 
   // === HIERARCHY ===
-  app.get(api.hierarchy.get.path, async (req, res) => {
+  app.get(api.hierarchy.get.path, requireAuth, async (req, res) => {
     const church = await storage.getChurch();
     if (!church) {
         // Return empty structure if not seeded yet
@@ -36,19 +41,35 @@ export async function registerRoutes(
   });
 
   // === MEMBERS ===
-  app.get(api.members.list.path, async (req, res) => {
-    // Filter logic can be added to storage
-    const members = await storage.getMembers();
-    res.json(members);
+  app.get(api.members.list.path, requireAuth, async (req, res) => {
+    const accessibleCellIds = await getAccessibleCellIds(req.user!);
+    const allMembers = await storage.getMembers();
+    
+    if (req.user!.role === UserRoles.ADMIN) {
+      return res.json(allMembers);
+    }
+    
+    const filteredMembers = allMembers.filter(m => 
+      m.cellId && accessibleCellIds.includes(m.cellId)
+    );
+    res.json(filteredMembers);
   });
 
-  app.get(api.members.get.path, async (req, res) => {
+  app.get(api.members.get.path, requireAuth, async (req, res) => {
     const member = await storage.getMember(Number(req.params.id));
     if (!member) return res.status(404).json({ message: "Member not found" });
+    
+    if (req.user!.role !== UserRoles.ADMIN) {
+      const accessibleCellIds = await getAccessibleCellIds(req.user!);
+      if (!member.cellId || !accessibleCellIds.includes(member.cellId)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+    }
+    
     res.json(member);
   });
 
-  app.post(api.members.create.path, async (req, res) => {
+  app.post(api.members.create.path, requireAuth, async (req, res) => {
     try {
       const input = api.members.create.input.parse(req.body);
       const member = await storage.createMember(input);
@@ -61,7 +82,7 @@ export async function registerRoutes(
     }
   });
 
-  app.put(api.members.update.path, async (req, res) => {
+  app.put(api.members.update.path, requireAuth, async (req, res) => {
     try {
         const input = api.members.update.input.parse(req.body);
         const member = await storage.updateMember(Number(req.params.id), input);
@@ -71,18 +92,18 @@ export async function registerRoutes(
     }
   });
 
-  app.delete(api.members.delete.path, async (req, res) => {
+  app.delete(api.members.delete.path, requireAuth, async (req, res) => {
     await storage.deleteMember(Number(req.params.id));
     res.status(204).send();
   });
 
   // === SERVICES ===
-  app.get(api.services.list.path, async (req, res) => {
+  app.get(api.services.list.path, requireAuth, async (req, res) => {
     const services = await storage.getServices();
     res.json(services);
   });
 
-  app.post(api.services.create.path, async (req, res) => {
+  app.post(api.services.create.path, requireAuth, async (req, res) => {
     try {
         const input = api.services.create.input.parse(req.body);
         const service = await storage.createService(input);
@@ -92,7 +113,7 @@ export async function registerRoutes(
     }
   });
 
-  app.patch(api.services.update.path, async (req, res) => {
+  app.patch(api.services.update.path, requireAuth, async (req, res) => {
     try {
         const input = api.services.update.input.parse(req.body);
         const service = await storage.updateService(Number(req.params.id), input);
@@ -103,7 +124,7 @@ export async function registerRoutes(
   });
 
   // === ATTENDANCE ===
-  app.post(api.attendance.mark.path, async (req, res) => {
+  app.post(api.attendance.mark.path, canMarkAttendance, async (req, res) => {
     try {
         const input = api.attendance.mark.input.parse(req.body);
         const record = await storage.markAttendance(input);
@@ -113,31 +134,40 @@ export async function registerRoutes(
     }
   });
 
-  app.get(api.attendance.list.path, async (req, res) => {
+  app.get(api.attendance.list.path, requireAuth, async (req, res) => {
     const serviceId = Number(req.query.serviceId);
     if (!serviceId) return res.status(400).json({ message: "serviceId required" });
     const records = await storage.getAttendanceForService(serviceId);
     res.json(records);
   });
 
-  app.get(api.attendance.stats.path, async (req, res) => {
+  app.get(api.attendance.stats.path, requireAuth, async (req, res) => {
     const serviceId = req.query.serviceId ? Number(req.query.serviceId) : undefined;
     const stats = await storage.getAttendanceStats(serviceId);
     res.json(stats);
   });
 
-  // === ADMIN / STRUCTURE ===
-  app.post("/api/admin/groups", async (req, res) => {
+  // === ADMIN / STRUCTURE (Admin only) ===
+  app.post("/api/admin/groups", requireAuth, async (req, res) => {
+    if (req.user?.role !== UserRoles.ADMIN) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
     const group = await storage.createGroup(req.body);
     res.status(201).json(group);
   });
 
-  app.post("/api/admin/pcfs", async (req, res) => {
+  app.post("/api/admin/pcfs", requireAuth, async (req, res) => {
+    if (req.user?.role !== UserRoles.ADMIN) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
     const pcf = await storage.createPcf(req.body);
     res.status(201).json(pcf);
   });
 
-  app.post("/api/admin/cells", async (req, res) => {
+  app.post("/api/admin/cells", requireAuth, async (req, res) => {
+    if (req.user?.role !== UserRoles.ADMIN) {
+      return res.status(403).json({ message: "Admin access required" });
+    }
     const cell = await storage.createCell(req.body);
     res.status(201).json(cell);
   });

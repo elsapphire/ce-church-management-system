@@ -1,7 +1,17 @@
 import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+
+// Role types for RBAC
+export const UserRoles = {
+  ADMIN: "admin",
+  GROUP_PASTOR: "group_pastor",
+  PCF_LEADER: "pcf_leader",
+  CELL_LEADER: "cell_leader",
+} as const;
+
+export type UserRole = typeof UserRoles[keyof typeof UserRoles];
 
 // Session storage table.
 // (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
@@ -15,7 +25,7 @@ export const sessions = pgTable(
   (table) => [index("IDX_session_expire").on(table.expire)]
 );
 
-// User storage table.
+// User storage table with role-based scoping.
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   email: varchar("email").unique(),
@@ -25,6 +35,10 @@ export const users = pgTable("users", {
   password: varchar("password"),
   role: varchar("role").default("member"),
   profileImageUrl: varchar("profile_image_url"),
+  churchId: integer("church_id"),
+  groupId: integer("group_id"),
+  pcfId: integer("pcf_id"),
+  cellId: integer("cell_id"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -31,6 +31,10 @@ export async function createUser(userData: {
   firstName?: string;
   lastName?: string;
   role?: string;
+  churchId?: number;
+  groupId?: number;
+  pcfId?: number;
+  cellId?: number;
 }): Promise<User> {
   const hashedPassword = await hashPassword(userData.password);
   const [user] = await db
@@ -148,18 +152,58 @@ export function setupLocalAuth(app: Express) {
   });
 }
 
-export async function seedAdminUser() {
-  const existingAdmin = await findUserByEmailOrUsername("admin@church.org");
-  if (!existingAdmin) {
-    console.log("Creating admin user...");
-    await createUser({
+export async function seedDummyUsers() {
+  const dummyUsers = [
+    {
       email: "admin@church.org",
       username: "admin",
       password: "admin123",
-      firstName: "Admin",
-      lastName: "User",
+      firstName: "Zonal",
+      lastName: "Pastor",
       role: "admin",
-    });
-    console.log("Admin user created: admin@church.org / admin123");
+      churchId: 1,
+    },
+    {
+      email: "grouppastor@church.org",
+      username: "grouppastor",
+      password: "group123",
+      firstName: "Group",
+      lastName: "Pastor",
+      role: "group_pastor",
+      churchId: 1,
+      groupId: 1,
+    },
+    {
+      email: "pcfleader@church.org",
+      username: "pcfleader",
+      password: "pcf123",
+      firstName: "PCF",
+      lastName: "Leader",
+      role: "pcf_leader",
+      churchId: 1,
+      groupId: 1,
+      pcfId: 1,
+    },
+    {
+      email: "cellleader@church.org",
+      username: "cellleader",
+      password: "cell123",
+      firstName: "Cell",
+      lastName: "Leader",
+      role: "cell_leader",
+      churchId: 1,
+      groupId: 1,
+      pcfId: 1,
+      cellId: 1,
+    },
+  ];
+
+  for (const userData of dummyUsers) {
+    const existing = await findUserByEmailOrUsername(userData.email);
+    if (!existing) {
+      console.log(`Creating ${userData.role} user: ${userData.email}...`);
+      await createUser(userData);
+      console.log(`Created: ${userData.email} / ${userData.password}`);
+    }
   }
 }

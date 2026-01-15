@@ -14,6 +14,17 @@ import {
 import logoUrl from "@assets/ce-logo-removebg-preview_1768304044152.png";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+
+const getRoleLabel = (role?: string | null) => {
+  switch (role) {
+    case "admin": return "Zonal Pastor";
+    case "group_pastor": return "Group Pastor";
+    case "pcf_leader": return "PCF Leader";
+    case "cell_leader": return "Cell Leader";
+    default: return "Member";
+  }
+};
 
 const navItems = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
@@ -57,13 +68,15 @@ export function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border/50 bg-muted/20">
-        <div className="flex items-center gap-3 mb-4 px-2">
-          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
+        <div className="flex items-center gap-3 mb-3 px-2">
+          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold shrink-0">
             {user?.firstName?.[0] || 'U'}
           </div>
-          <div className="overflow-hidden">
+          <div className="overflow-hidden flex-1 min-w-0">
             <p className="text-sm font-semibold truncate">{user?.firstName} {user?.lastName}</p>
-            <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+            <Badge variant="secondary" className="text-[10px] mt-1" data-testid="badge-role">
+              {getRoleLabel(user?.role)}
+            </Badge>
           </div>
         </div>
         <Button 
