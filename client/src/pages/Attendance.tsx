@@ -20,10 +20,16 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { QrCode, CheckCircle2, User, Search, Lock, Users, UserX } from "lucide-react";
+import { QrCode, CheckCircle2, User, Search, Lock, Users, UserX, Printer, FileDown, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { StatsCard } from "@/components/StatsCard";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const canMarkAttendance = (role?: string | null) => {
   return role === "admin" || role === "group_pastor";
@@ -54,23 +60,47 @@ export default function Attendance() {
         <p className="text-muted-foreground">Mark and monitor attendance records.</p>
       </div>
 
-      <div className="w-full max-w-xs mb-6 mt-4">
-        <label className="text-sm font-medium mb-1.5 block">Select Service</label>
-        <Select 
-          value={selectedServiceId?.toString()} 
-          onValueChange={(val) => setSelectedServiceId(Number(val))}
-        >
-          <SelectTrigger data-testid="select-service">
-            <SelectValue placeholder="Choose a service..." />
-          </SelectTrigger>
-          <SelectContent>
-            {services?.map((service) => (
-              <SelectItem key={service.id} value={service.id.toString()}>
-                {service.name} ({format(new Date(service.date), 'MMM d')})
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-6 mt-4">
+        <div className="w-full max-w-xs">
+          <label className="text-sm font-medium mb-1.5 block">Select Service</label>
+          <Select 
+            value={selectedServiceId?.toString()} 
+            onValueChange={(val) => setSelectedServiceId(Number(val))}
+          >
+            <SelectTrigger data-testid="select-service">
+              <SelectValue placeholder="Choose a service..." />
+            </SelectTrigger>
+            <SelectContent>
+              {services?.map((service) => (
+                <SelectItem key={service.id} value={service.id.toString()}>
+                  {service.name} ({format(new Date(service.date), 'MMM d')})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <FileDown className="h-4 w-4" />
+                Print / Export
+                <ChevronDown className="h-4 w-4 opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => window.print()}>
+                <Printer className="h-4 w-4" />
+                Print as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => alert('Exporting to XLSX...')}>
+                <FileDown className="h-4 w-4" />
+                Export as XLSX
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -216,41 +246,43 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
   if (isLoading) return <p>Loading records...</p>;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-border bg-muted/10">
-        <h3 className="font-semibold">{records?.length || 0} Present</h3>
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
+      <div className="p-6 border-b border-border bg-muted/10 print:px-0">
+        <h3 className="font-semibold text-lg">{records?.length || 0} Members in Church</h3>
       </div>
-      <table className="w-full text-sm text-left">
-        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
-          <tr>
-            <th className="px-6 py-4">Time</th>
-            <th className="px-6 py-4">Member</th>
-            <th className="px-6 py-4">Method</th>
-            <th className="px-6 py-4">Location</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {records?.map((record) => (
-            <tr key={record.id}>
-              <td className="px-6 py-4 text-muted-foreground">
-                {record.checkInTime ? format(new Date(record.checkInTime), 'h:mm a') : '-'}
-              </td>
-              <td className="px-6 py-4 font-medium">{record.member.fullName}</td>
-              <td className="px-6 py-4">
-                <span className="capitalize px-2 py-1 rounded-full bg-muted text-xs">
-                  {record.method.replace('_', ' ')}
-                </span>
-              </td>
-              <td className="px-6 py-4 text-muted-foreground">{record.location || '-'}</td>
-            </tr>
-          ))}
-          {!records?.length && (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <td colSpan={4} className="px-6 py-8 text-center text-muted-foreground">No attendance records yet.</td>
+              <th className="px-8 py-5 tracking-wider">Time</th>
+              <th className="px-8 py-5 tracking-wider">Member</th>
+              <th className="px-8 py-5 tracking-wider">Method</th>
+              <th className="px-8 py-5 tracking-wider">Location</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {records?.map((record) => (
+              <tr key={record.id} className="hover:bg-muted/30 transition-colors">
+                <td className="px-8 py-5 text-muted-foreground">
+                  {record.checkInTime ? format(new Date(record.checkInTime), 'h:mm a') : '-'}
+                </td>
+                <td className="px-8 py-5 font-medium">{record.member.fullName}</td>
+                <td className="px-8 py-5">
+                  <span className="capitalize px-2.5 py-1 rounded-full bg-muted text-xs font-medium">
+                    {record.method.replace('_', ' ')}
+                  </span>
+                </td>
+                <td className="px-8 py-5 text-muted-foreground">{record.location || '-'}</td>
+              </tr>
+            ))}
+            {!records?.length && (
+              <tr>
+                <td colSpan={4} className="px-8 py-12 text-center text-muted-foreground italic text-base">No attendance records yet for this service.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -268,42 +300,45 @@ function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
   if (loadingMembers || loadingAttendance) return <p>Loading members...</p>;
 
   return (
-    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-border bg-muted/10">
-        <h3 className="font-semibold">{absentMembers.length} Absent</h3>
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden print:border-none print:shadow-none">
+      <div className="p-6 border-b border-border bg-muted/10 print:px-0">
+        <h3 className="font-semibold text-lg">{absentMembers.length} Members Absent</h3>
       </div>
-      <table className="w-full text-sm text-left">
-        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
-          <tr>
-            <th className="px-6 py-4">Member</th>
-            <th className="px-6 py-4">Phone</th>
-            <th className="px-6 py-4">Status</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {absentMembers.map((member) => (
-            <tr key={member.id}>
-              <td className="px-6 py-4 font-medium">{member.fullName}</td>
-              <td className="px-6 py-4 text-muted-foreground">{member.phone || '-'}</td>
-              <td className="px-6 py-4">
-                <span className={`px-2 py-1 rounded-full text-xs ${
-                  member.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  {member.status}
-                </span>
-              </td>
-            </tr>
-          ))}
-          {absentMembers.length === 0 && (
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left border-collapse">
+          <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-bold border-b border-border">
             <tr>
-              <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">All members are present!</td>
+              <th className="px-8 py-5 tracking-wider">Member</th>
+              <th className="px-8 py-5 tracking-wider">Phone</th>
+              <th className="px-8 py-5 tracking-wider">Status</th>
             </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {absentMembers.map((member) => (
+              <tr key={member.id} className="hover:bg-muted/30 transition-colors">
+                <td className="px-8 py-5 font-medium">{member.fullName}</td>
+                <td className="px-8 py-5 text-muted-foreground">{member.phone || '-'}</td>
+                <td className="px-8 py-5">
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                    member.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {member.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+            {absentMembers.length === 0 && (
+              <tr>
+                <td colSpan={3} className="px-8 py-12 text-center text-muted-foreground italic text-base">All members are present!</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
+
 
 function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
   const { data: stats } = useAttendanceStats(serviceId);
