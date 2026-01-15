@@ -3,7 +3,7 @@ import { useServices } from "@/hooks/use-services";
 import { useAttendanceList, useMarkAttendance, useAttendanceStats } from "@/hooks/use-attendance";
 import { useMembers } from "@/hooks/use-members";
 import { useAuth } from "@/hooks/use-auth";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -20,9 +20,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { QrCode, CheckCircle2, User, Search, Lock } from "lucide-react";
+import { QrCode, CheckCircle2, User, Search, Lock, Users, UserX } from "lucide-react";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { StatsCard } from "@/components/StatsCard";
 
 const canMarkAttendance = (role?: string | null) => {
   return role === "admin" || role === "group_pastor";
@@ -30,6 +31,7 @@ const canMarkAttendance = (role?: string | null) => {
 
 export default function Attendance() {
   const { data: services } = useServices();
+  const { data: allMembers } = useMembers();
   const { user } = useAuth();
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
   const hasMarkPermission = canMarkAttendance(user?.role);
@@ -40,6 +42,11 @@ export default function Attendance() {
     if (activeService) setSelectedServiceId(activeService.id);
   }
 
+  const { data: records } = useAttendanceList(selectedServiceId || 0);
+
+  const presentCount = records?.length || 0;
+  const absentCount = Math.max(0, (allMembers?.length || 0) - presentCount);
+
   return (
     <Layout>
       <div className="flex flex-col gap-2">
@@ -47,7 +54,7 @@ export default function Attendance() {
         <p className="text-muted-foreground">Mark and monitor attendance records.</p>
       </div>
 
-      <div className="w-full max-w-xs mb-6">
+      <div className="w-full max-w-xs mb-6 mt-4">
         <label className="text-sm font-medium mb-1.5 block">Select Service</label>
         <Select 
           value={selectedServiceId?.toString()} 
@@ -66,13 +73,29 @@ export default function Attendance() {
         </Select>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <StatsCard
+          title="Members in Church"
+          value={presentCount}
+          icon={Users}
+          description="Marked as present"
+        />
+        <StatsCard
+          title="Members Absent"
+          value={absentCount}
+          icon={UserX}
+          description="Not yet marked present"
+        />
+      </div>
+
       {selectedServiceId ? (
         <Tabs defaultValue={hasMarkPermission ? "mark" : "list"} className="w-full">
-          <TabsList className={`grid w-full max-w-[400px] ${hasMarkPermission ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full max-w-[500px] ${hasMarkPermission ? 'grid-cols-4' : 'grid-cols-3'}`}>
             {hasMarkPermission && (
               <TabsTrigger value="mark" data-testid="tab-mark">Mark Attendance</TabsTrigger>
             )}
-            <TabsTrigger value="list" data-testid="tab-list">View List</TabsTrigger>
+            <TabsTrigger value="list" data-testid="tab-list">Members in Church</TabsTrigger>
+            <TabsTrigger value="absent" data-testid="tab-absent">Members Absent</TabsTrigger>
             <TabsTrigger value="stats" data-testid="tab-stats">Statistics</TabsTrigger>
           </TabsList>
           
@@ -85,6 +108,10 @@ export default function Attendance() {
             
             <TabsContent value="list">
               <AttendanceListPanel serviceId={selectedServiceId} />
+            </TabsContent>
+
+            <TabsContent value="absent">
+              <AbsentMembersPanel serviceId={selectedServiceId} />
             </TabsContent>
             
             <TabsContent value="stats">
@@ -191,7 +218,7 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
       <div className="p-4 border-b border-border bg-muted/10">
-        <h3 className="font-semibold">{records?.length || 0} Attendees</h3>
+        <h3 className="font-semibold">{records?.length || 0} Present</h3>
       </div>
       <table className="w-full text-sm text-left">
         <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
@@ -224,6 +251,114 @@ function AttendanceListPanel({ serviceId }: { serviceId: number }) {
           )}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function AbsentMembersPanel({ serviceId }: { serviceId: number }) {
+  const { data: allMembers, isLoading: loadingMembers } = useMembers();
+  const { data: records, isLoading: loadingAttendance } = useAttendanceList(serviceId);
+
+  const absentMembers = useMemo(() => {
+    if (!allMembers || !records) return [];
+    const presentIds = new Set(records.map(r => r.memberId));
+    return allMembers.filter(m => !presentIds.has(m.id));
+  }, [allMembers, records]);
+
+  if (loadingMembers || loadingAttendance) return <p>Loading members...</p>;
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-border bg-muted/10">
+        <h3 className="font-semibold">{absentMembers.length} Absent</h3>
+      </div>
+      <table className="w-full text-sm text-left">
+        <thead className="bg-muted/50 text-muted-foreground uppercase text-xs font-semibold">
+          <tr>
+            <th className="px-6 py-4">Member</th>
+            <th className="px-6 py-4">Phone</th>
+            <th className="px-6 py-4">Status</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {absentMembers.map((member) => (
+            <tr key={member.id}>
+              <td className="px-6 py-4 font-medium">{member.fullName}</td>
+              <td className="px-6 py-4 text-muted-foreground">{member.phone || '-'}</td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-full text-xs ${
+                  member.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {member.status}
+                </span>
+              </td>
+            </tr>
+          ))}
+          {absentMembers.length === 0 && (
+            <tr>
+              <td colSpan={3} className="px-6 py-8 text-center text-muted-foreground">All members are present!</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AttendanceStatsPanel({ serviceId }: { serviceId: number }) {
+  const { data: stats } = useAttendanceStats(serviceId);
+  const { user } = useAuth();
+  
+  if (!stats?.[0]) return <p>No stats available.</p>;
+  
+  const currentStat = stats[0];
+  const methodData = Object.entries(currentStat.byMethod).map(([name, value]) => ({
+    name: name.replace('_', ' '),
+    value
+  }));
+
+  const cellData = Object.entries(currentStat.byCell).map(([id, value]) => ({
+    name: `Cell ${id}`,
+    value
+  }));
+
+  const showCellBreakdown = user?.role === "admin" || user?.role === "group_pastor" || user?.role === "pcf_leader";
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <Card className={!showCellBreakdown ? "md:col-span-2" : ""}>
+        <CardHeader>
+          <CardTitle>Check-in Methods</CardTitle>
+        </CardHeader>
+        <CardContent className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={methodData}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {showCellBreakdown && (
+        <Card>
+          <CardHeader>
+            <CardTitle>By Cell Group</CardTitle>
+          </CardHeader>
+          <CardContent className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cellData}>
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="value" fill="hsl(var(--secondary-foreground))" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
