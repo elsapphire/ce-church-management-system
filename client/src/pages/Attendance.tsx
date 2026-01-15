@@ -186,20 +186,40 @@ export default function Attendance() {
 function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
   const [open, setOpen] = useState(false);
   const [searchValue, setSearchValue] = useState("");
+  const [queue, setQueue] = useState<any[]>([]);
   const { mutate, isPending } = useMarkAttendance();
   const { data: members } = useMembers();
 
-  const handleMark = (memberId: number) => {
-    mutate({
-      serviceId,
-      memberId,
-      method: "manual",
-      location: "Main Auditorium"
-    }, {
-      onSuccess: () => {
-        setOpen(false);
-        setSearchValue("");
-      }
+  const addToQueue = (member: any) => {
+    if (!queue.find(m => m.id === member.id)) {
+      setQueue([...queue, member]);
+    }
+    setOpen(false);
+    setSearchValue("");
+  };
+
+  const removeFromQueue = (memberId: number) => {
+    setQueue(queue.filter(m => m.id !== memberId));
+  };
+
+  const handleBatchMark = () => {
+    if (queue.length === 0) return;
+    
+    // In Fast Mode, we'll iterate through the queue. 
+    // Ideally the backend would have a batch endpoint, but we'll stick to the logic as requested.
+    queue.forEach((member, index) => {
+      mutate({
+        serviceId,
+        memberId: member.id,
+        method: "manual",
+        location: "Main Auditorium"
+      }, {
+        onSuccess: () => {
+          if (index === queue.length - 1) {
+            setQueue([]);
+          }
+        }
+      });
     });
   };
 
@@ -216,12 +236,12 @@ function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-      <Card>
+      <Card className="flex flex-col">
         <CardHeader>
           <CardTitle>Member Search</CardTitle>
-          <CardDescription>Search by name or ID to mark attendance.</CardDescription>
+          <CardDescription>Search by name or ID to add to queue.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex-1">
           <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
               <Button
@@ -245,17 +265,8 @@ function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
                       <CommandItem
                         key={member.id}
                         value={`${member.fullName} ${member.id}`}
-                        onSelect={() => {
-                          setSearchValue(member.fullName);
-                          handleMark(member.id);
-                        }}
+                        onSelect={() => addToQueue(member)}
                       >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            searchValue === member.fullName ? "opacity-100" : "opacity-0"
-                          )}
-                        />
                         <div className="flex flex-col">
                           <span className="font-medium">{member.fullName}</span>
                           <span className="text-xs text-muted-foreground">ID: {member.id} • {member.title}</span>
@@ -267,7 +278,45 @@ function MarkAttendancePanel({ serviceId }: { serviceId: number }) {
               </Command>
             </PopoverContent>
           </Popover>
+
+          {queue.length > 0 && (
+            <div className="mt-6 space-y-2">
+              <h4 className="text-sm font-semibold mb-2">Queue ({queue.length})</h4>
+              <div className="max-h-[200px] overflow-y-auto space-y-2 pr-2">
+                {queue.map((member) => (
+                  <div key={member.id} className="flex items-center justify-between p-2 rounded-lg bg-muted/50 border border-border">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium">{member.fullName}</span>
+                      <span className="text-[10px] text-muted-foreground">
+                        {member.title} • {member.cellGroup || 'No Cell'}
+                      </span>
+                    </div>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6" 
+                      onClick={() => removeFromQueue(member.id)}
+                    >
+                      <UserX className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
+        {queue.length > 0 && (
+          <div className="p-6 pt-0 mt-auto flex justify-end">
+            <Button 
+              onClick={handleBatchMark} 
+              disabled={isPending}
+              className="gap-2"
+            >
+              <CheckCircle2 className="h-4 w-4" />
+              Mark Present ({queue.length})
+            </Button>
+          </div>
+        )}
       </Card>
 
       <Card className="bg-primary/5 border-primary/20">
