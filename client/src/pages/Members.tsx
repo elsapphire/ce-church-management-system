@@ -39,6 +39,7 @@ export default function Members() {
   });
   const { data: hierarchy } = useHierarchy();
   const { mutate: deleteMember } = useDeleteMember();
+  const { user } = useAuth();
 
   // Filter logic for cascading selects
   const filteredPcfs = hierarchy?.pcfs.filter(p => groupId === "all" || p.groupId === Number(groupId)) || [];
