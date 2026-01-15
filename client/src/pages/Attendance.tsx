@@ -44,6 +44,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 const canMarkAttendance = (role?: string | null) => {
   return role === "admin" || role === "group_pastor";
@@ -66,6 +69,93 @@ export default function Attendance() {
 
   const presentCount = records?.length || 0;
   const absentCount = Math.max(0, (allMembers?.length || 0) - presentCount);
+
+  const handleExportPDF = () => {
+    if (!selectedServiceId || !services || !allMembers || !records) return;
+    const service = services.find(s => s.id === selectedServiceId);
+    if (!service) return;
+
+    const doc = new jsPDF();
+    const serviceDate = format(new Date(service.date), 'MMMM d, yyyy');
+    
+    doc.setFontSize(18);
+    doc.text(`Attendance Report: ${service.name}`, 14, 20);
+    doc.setFontSize(11);
+    doc.text(`Date: ${serviceDate}`, 14, 28);
+    doc.text(`Summary: ${presentCount} Present, ${absentCount} Absent`, 14, 35);
+
+    const presentData = records.map((r, i) => [
+      i + 1,
+      r.member.fullName,
+      r.member.title,
+      r.member.cellGroup || '-',
+      r.member.pcf || '-',
+      r.member.phone || '-'
+    ]);
+
+    doc.setFontSize(14);
+    doc.text('Present Members', 14, 45);
+    autoTable(doc, {
+      startY: 50,
+      head: [['#', 'Name', 'Title', 'Cell', 'PCF', 'Phone']],
+      body: presentData,
+      theme: 'striped',
+      headStyles: { fillColor: [41, 128, 185] }
+    });
+
+    const presentIds = new Set(records.map(r => r.memberId));
+    const absentMembers = allMembers.filter(m => !presentIds.has(m.id));
+    const absentData = absentMembers.map((m, i) => [
+      i + 1,
+      m.fullName,
+      m.title,
+      m.cellGroup || '-',
+      m.pcf || '-',
+      m.phone || '-'
+    ]);
+
+    const finalY = (doc as any).lastAutoTable.finalY || 50;
+    doc.text('Absent Members', 14, finalY + 15);
+    autoTable(doc, {
+      startY: finalY + 20,
+      head: [['#', 'Name', 'Title', 'Cell', 'PCF', 'Phone']],
+      body: absentData,
+      theme: 'striped',
+      headStyles: { fillColor: [192, 57, 43] }
+    });
+
+    doc.save(`Attendance_${service.name}_${format(new Date(service.date), 'yyyy-MM-dd')}.pdf`);
+  };
+
+  const handleExportXLSX = () => {
+    if (!selectedServiceId || !services || !allMembers || !records) return;
+    const service = services.find(s => s.id === selectedServiceId);
+    if (!service) return;
+
+    const presentIds = new Set(records.map(r => r.memberId));
+    const absentMembers = allMembers.filter(m => !presentIds.has(m.id));
+
+    const formatMember = (m: any, i: number) => ({
+      '#': i + 1,
+      'Name': m.fullName,
+      'Title': m.title,
+      'Cell': m.cellGroup || '-',
+      'PCF': m.pcf || '-',
+      'Phone': m.phone || '-'
+    });
+
+    const presentSheetData = records.map((r, i) => formatMember(r.member, i));
+    const absentSheetData = absentMembers.map((m, i) => formatMember(m, i));
+
+    const wb = XLSX.utils.book_new();
+    const wsPresent = XLSX.utils.json_to_sheet(presentSheetData);
+    const wsAbsent = XLSX.utils.json_to_sheet(absentSheetData);
+
+    XLSX.utils.book_append_sheet(wb, wsPresent, "Present Members");
+    XLSX.utils.book_append_sheet(wb, wsAbsent, "Absent Members");
+
+    XLSX.writeFile(wb, `Attendance_${service.name}_${format(new Date(service.date), 'yyyy-MM-dd')}.xlsx`);
+  };
 
   return (
     <Layout>
@@ -104,11 +194,11 @@ export default function Attendance() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => alert('Exporting to PDF...')}>
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={handleExportPDF}>
                 <Printer className="h-4 w-4" />
                 Export as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={() => alert('Exporting to XLSX...')}>
+              <DropdownMenuItem className="gap-2 cursor-pointer" onClick={handleExportXLSX}>
                 <FileDown className="h-4 w-4" />
                 Export as XLSX
               </DropdownMenuItem>
