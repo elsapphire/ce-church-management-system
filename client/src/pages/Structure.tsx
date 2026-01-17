@@ -11,10 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Network, Layers, Home, Search, UserCircle, Trash2 } from "lucide-react";
+import { Plus, Network, Layers, Home, Search, UserCircle, Trash2, Mail, Lock, Shield } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 
@@ -112,6 +113,7 @@ export default function Structure() {
 
   const [groupName, setGroupName] = useState("");
   const [groupLeaderId, setGroupLeaderId] = useState("");
+  const [createGroupUser, setCreateGroupUser] = useState(false);
   
   const [pcfName, setPcfName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
@@ -320,6 +322,45 @@ export default function Structure() {
                       placeholder="Select Group Pastor..."
                     />
                   </div>
+
+                  <div className="flex items-center space-x-2 pt-2">
+                    <Checkbox 
+                      id="create-user" 
+                      checked={createGroupUser} 
+                      onCheckedChange={(checked) => setCreateGroupUser(checked === true)}
+                      data-testid="checkbox-create-user"
+                    />
+                    <Label 
+                      htmlFor="create-user" 
+                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      Create user account?
+                    </Label>
+                  </div>
+
+                  {createGroupUser && (
+                    <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> Email
+                        </Label>
+                        <Input disabled placeholder="Email for the new user" className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Temporary Password
+                        </Label>
+                        <Input disabled placeholder="Auto-generated" className="h-8 text-sm" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Shield className="w-3 h-3" /> Role
+                        </Label>
+                        <Input disabled value="Group Pastor" className="h-8 text-sm" />
+                      </div>
+                    </div>
+                  )}
+
                   <Button className="w-full" onClick={handleAddGroup} disabled={isPending || !groupName} data-testid="button-add-group">
                     <Plus className="w-4 h-4 mr-2" /> Add Group
                   </Button>
