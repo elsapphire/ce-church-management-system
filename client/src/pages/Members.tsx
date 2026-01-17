@@ -341,7 +341,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Title</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select title" />
@@ -436,7 +436,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                   name="birthDay"
                   render={({ field }) => (
                     <FormItem>
-                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString()}>
+                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Day" />
@@ -457,7 +457,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
                   name="birthMonth"
                   render={({ field }) => (
                     <FormItem>
-                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString()}>
+                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Month" />
