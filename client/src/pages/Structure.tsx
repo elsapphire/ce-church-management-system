@@ -15,7 +15,9 @@ import { Plus, Network, Layers, Home, Search, UserCircle, Trash2, Mail, Lock, Sh
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useMembers } from "@/hooks/use-members";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 
@@ -571,48 +573,46 @@ export default function Structure() {
                     </div>
                   )}
 
-                      {createPcfUser && (
-                        <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Mail className="w-3 h-3" /> Email
-                            </Label>
-                            <Input 
-                              placeholder="Email for the new user" 
-                              className="h-8 text-sm" 
-                              value={pcfUserEmail}
-                              onChange={(e) => setPcfUserEmail(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Lock className="w-3 h-3" /> Temporary Password
-                            </Label>
-                            <Input 
-                              placeholder="Temporary password" 
-                              className="h-8 text-sm" 
-                              value={pcfUserPassword}
-                              onChange={(e) => setPcfUserPassword(e.target.value)}
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Shield className="w-3 h-3" /> Role
-                            </Label>
-                            <Select value={pcfUserRole} onValueChange={setPcfUserRole}>
-                              <SelectTrigger className="h-8 text-sm">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="pcf_leader">PCF Leader</SelectItem>
-                                <SelectItem value="cell_leader">Cell Leader</SelectItem>
-                                <SelectItem value="member">Member</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      )}
-                    </>
+                  {createPcfUser && (
+                    <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Mail className="w-3 h-3" /> Email
+                        </Label>
+                        <Input 
+                          placeholder="Email for the new user" 
+                          className="h-8 text-sm" 
+                          value={pcfUserEmail}
+                          onChange={(e) => setPcfUserEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Lock className="w-3 h-3" /> Temporary Password
+                        </Label>
+                        <Input 
+                          placeholder="Temporary password" 
+                          className="h-8 text-sm" 
+                          value={pcfUserPassword}
+                          onChange={(e) => setPcfUserPassword(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Shield className="w-3 h-3" /> Role
+                        </Label>
+                        <Select value={pcfUserRole} onValueChange={setPcfUserRole}>
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pcf_leader">PCF Leader</SelectItem>
+                            <SelectItem value="cell_leader">Cell Leader</SelectItem>
+                            <SelectItem value="member">Member</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   )}
 
                   <Button className="w-full" onClick={handleAddPcf} disabled={isPending || !pcfName || !selectedGroupId} data-testid="button-add-pcf">
