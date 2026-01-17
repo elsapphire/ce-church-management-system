@@ -31,48 +31,31 @@ function LeaderCombobox({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { data: users } = useUsers();
-  const { data: hierarchy } = useHierarchy();
-
-  const members = useMemo(() => {
-    if (!hierarchy?.groups) return [];
-    const allPcfs = hierarchy.groups.flatMap(g => hierarchy.pcfs.filter(p => p.groupId === g.id));
-    const allCells = allPcfs.flatMap(p => hierarchy.cells.filter(c => c.pcfId === p.id));
-    
-    // We need members too, let's assume useHierarchy doesn't have all members.
-    // Actually, looking at the hierarchy data, it usually doesn't include the full member list.
-    // I should check if there's a useMembers hook.
-    return [];
-  }, [hierarchy]);
+  const { data: members } = useMembers();
 
   const filteredItems = useMemo(() => {
-    const items: { id: string; name: string; email: string; type: 'user' | 'member' }[] = [];
+    if (!members) return [];
     
-    if (users) {
-      users.forEach(u => {
-        items.push({
-          id: u.id,
-          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
-          email: u.email,
-          type: 'user'
-        });
-      });
-    }
-
-    // Since I don't have a useMembers hook yet, I'll stick to users for now but prepare the structure
-    // Actually I can use the existing users list.
+    const items = members.map(m => {
+      const linkedUser = users?.find(u => u.memberId === m.id);
+      return {
+        id: m.id.toString(),
+        name: m.fullName,
+        email: m.email || "No email",
+        hasUser: !!linkedUser,
+        userId: linkedUser?.id
+      };
+    });
     
     const lowerSearch = search.toLowerCase();
     return items.filter(i => 
       i.name.toLowerCase().includes(lowerSearch) || 
       i.email.toLowerCase().includes(lowerSearch)
     ).slice(0, 50);
-  }, [users, search]);
+  }, [members, users, search]);
 
-  const selectedItem = filteredItems.find(i => i.id === value) || (users?.find(u => u.id === value) ? {
-    name: `${users.find(u => u.id === value)?.firstName || ''} ${users.find(u => u.id === value)?.lastName || ''}`.trim() || users.find(u => u.id === value)?.email,
-  } : null);
-
-  const displayName = selectedItem?.name || placeholder;
+  const selectedMember = members?.find(m => m.id.toString() === value);
+  const displayName = selectedMember?.fullName || placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -91,12 +74,12 @@ function LeaderCombobox({
       <PopoverContent className="w-[300px] p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput 
-            placeholder="Search by name or email..." 
+            placeholder="Search members..." 
             value={search}
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No one found.</CommandEmpty>
+            <CommandEmpty>No member found.</CommandEmpty>
             <CommandGroup>
               {filteredItems.map((item) => (
                 <CommandItem
@@ -114,7 +97,12 @@ function LeaderCombobox({
                     )}
                   />
                   <div className="flex flex-col">
-                    <span>{item.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{item.name}</span>
+                      {item.hasUser && (
+                        <Badge variant="secondary" className="text-[10px] h-4 px-1">User</Badge>
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">{item.email}</span>
                   </div>
                 </CommandItem>
@@ -130,6 +118,7 @@ function LeaderCombobox({
 export default function Structure() {
   const { data: hierarchy, isLoading } = useHierarchy();
   const { data: users } = useUsers();
+  const { data: members } = useMembers();
   const { user } = useAuth();
   const { toast } = useToast();
   const [isPending, setIsPending] = useState(false);
@@ -156,6 +145,32 @@ export default function Structure() {
   const [cellName, setCellName] = useState("");
   const [selectedPcfId, setSelectedPcfId] = useState<string>("");
   const [cellLeaderId, setCellLeaderId] = useState("");
+
+  const selectedGroupLeaderMember = useMemo(() => {
+    return members?.find(m => m.id.toString() === groupLeaderId);
+  }, [members, groupLeaderId]);
+
+  const groupLeaderHasUser = useMemo(() => {
+    if (!selectedGroupLeaderMember) return false;
+    return !!users?.find(u => u.memberId === selectedGroupLeaderMember.id);
+  }, [selectedGroupLeaderMember, users]);
+
+  const selectedPcfLeaderMember = useMemo(() => {
+    return members?.find(m => m.id.toString() === pcfLeaderId);
+  }, [members, pcfLeaderId]);
+
+  const pcfLeaderHasUser = useMemo(() => {
+    if (!selectedPcfLeaderMember) return false;
+    return !!users?.find(u => u.memberId === selectedPcfLeaderMember.id);
+  }, [selectedPcfLeaderMember, users]);
+
+  useEffect(() => {
+    if (groupLeaderHasUser) setCreateGroupUser(false);
+  }, [groupLeaderHasUser]);
+
+  useEffect(() => {
+    if (pcfLeaderHasUser) setCreatePcfUser(false);
+  }, [pcfLeaderHasUser]);
 
   const accessibleGroups = useMemo(() => {
     if (!hierarchy) return [];
@@ -367,24 +382,34 @@ export default function Structure() {
                     <LeaderCombobox
                       value={groupLeaderId}
                       onValueChange={setGroupLeaderId}
-                      placeholder="Select Group Pastor..."
+                      placeholder="Select Member..."
                     />
                   </div>
 
-                  <div className="flex items-center space-x-2 pt-2">
-                    <Checkbox 
-                      id="create-user" 
-                      checked={createGroupUser} 
-                      onCheckedChange={(checked) => setCreateGroupUser(checked === true)}
-                      data-testid="checkbox-create-user"
-                    />
-                    <Label 
-                      htmlFor="create-user" 
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                    >
-                      Create user account?
-                    </Label>
-                  </div>
+                  {groupLeaderId && !groupLeaderHasUser && (
+                    <div className="flex items-center space-x-2 pt-2 animate-in fade-in duration-200">
+                      <Checkbox 
+                        id="create-user" 
+                        checked={createGroupUser} 
+                        onCheckedChange={(checked) => setCreateGroupUser(checked === true)}
+                        data-testid="checkbox-create-user"
+                      />
+                      <Label 
+                        htmlFor="create-user" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Create user account for this member?
+                      </Label>
+                    </div>
+                  )}
+
+                  {groupLeaderId && groupLeaderHasUser && (
+                    <div className="pt-2">
+                      <Badge variant="secondary" className="w-full justify-center py-1">
+                        Member already has a user account
+                      </Badge>
+                    </div>
+                  )}
 
                   {createGroupUser && (
                     <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
@@ -517,26 +542,34 @@ export default function Structure() {
                     <LeaderCombobox
                       value={pcfLeaderId}
                       onValueChange={setPcfLeaderId}
-                      placeholder="Select PCF Leader..."
+                      placeholder="Select Member..."
                     />
                   </div>
 
-                  {isGroupPastor && (
-                    <>
-                      <div className="flex items-center space-x-2 pt-2">
-                        <Checkbox 
-                          id="create-pcf-user" 
-                          checked={createPcfUser} 
-                          onCheckedChange={(checked) => setCreatePcfUser(checked === true)}
-                          data-testid="checkbox-create-pcf-user"
-                        />
-                        <Label 
-                          htmlFor="create-pcf-user" 
-                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                        >
-                          Create user account for this member?
-                        </Label>
-                      </div>
+                  {pcfLeaderId && !pcfLeaderHasUser && (
+                    <div className="flex items-center space-x-2 pt-2 animate-in fade-in duration-200">
+                      <Checkbox 
+                        id="create-pcf-user" 
+                        checked={createPcfUser} 
+                        onCheckedChange={(checked) => setCreatePcfUser(checked === true)}
+                        data-testid="checkbox-create-pcf-user"
+                      />
+                      <Label 
+                        htmlFor="create-pcf-user" 
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Create user account for this member?
+                      </Label>
+                    </div>
+                  )}
+
+                  {pcfLeaderId && pcfLeaderHasUser && (
+                    <div className="pt-2">
+                      <Badge variant="secondary" className="w-full justify-center py-1">
+                        Member already has a user account
+                      </Badge>
+                    </div>
+                  )}
 
                       {createPcfUser && (
                         <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
