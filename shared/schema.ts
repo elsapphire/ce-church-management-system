@@ -40,8 +40,12 @@ export const members = pgTable("members", {
   id: serial("id").primaryKey(),
   fullName: text("full_name").notNull(),
   phone: text("phone"),
+  email: text("email").unique(),
   gender: text("gender"), // Male, Female
   title: text("title"),
+  designation: text("designation").default("MEMBER").notNull(), // MEMBER, CELL_LEADER, PCF_LEADER, GROUP_PASTOR, PASTORAL_ASSISTANT
+  birthDay: integer("birth_day"), // 1-31
+  birthMonth: integer("birth_month"), // 1-12
   photoUrl: text("photo_url"),
   status: text("status").default("Active"), // Active, Inactive
   biometricTemplate: text("biometric_template"), // Future use
