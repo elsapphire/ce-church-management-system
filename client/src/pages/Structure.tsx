@@ -121,6 +121,10 @@ export default function Structure() {
   const [pcfName, setPcfName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
   const [pcfLeaderId, setPcfLeaderId] = useState("");
+  const [createPcfUser, setCreatePcfUser] = useState(false);
+  const [pcfUserEmail, setPcfUserEmail] = useState("");
+  const [pcfUserPassword, setPcfUserPassword] = useState("");
+  const [pcfUserRole, setPcfUserRole] = useState("pcf_leader");
   
   const [cellName, setCellName] = useState("");
   const [selectedPcfId, setSelectedPcfId] = useState<string>("");
@@ -209,11 +213,18 @@ export default function Structure() {
       await apiRequest("POST", "/api/admin/pcfs", { 
         name: pcfName, 
         groupId: Number(selectedGroupId),
-        leaderId: pcfLeaderId || undefined
+        leaderId: pcfLeaderId || undefined,
+        createUser: createPcfUser,
+        userEmail: createPcfUser ? pcfUserEmail : undefined,
+        userPassword: createPcfUser ? pcfUserPassword : undefined,
+        userRole: createPcfUser ? pcfUserRole : undefined
       });
       toast({ title: "Success", description: "PCF added successfully" });
       setPcfName("");
       setPcfLeaderId("");
+      setCreatePcfUser(false);
+      setPcfUserEmail("");
+      setPcfUserPassword("");
       queryClient.invalidateQueries({ queryKey: ["/api/hierarchy"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     } catch (err: any) {
@@ -482,6 +493,68 @@ export default function Structure() {
                       placeholder="Select PCF Leader..."
                     />
                   </div>
+
+                  {isGroupPastor && (
+                    <>
+                      <div className="flex items-center space-x-2 pt-2">
+                        <Checkbox 
+                          id="create-pcf-user" 
+                          checked={createPcfUser} 
+                          onCheckedChange={(checked) => setCreatePcfUser(checked === true)}
+                          data-testid="checkbox-create-pcf-user"
+                        />
+                        <Label 
+                          htmlFor="create-pcf-user" 
+                          className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                        >
+                          Create user account for this member?
+                        </Label>
+                      </div>
+
+                      {createPcfUser && (
+                        <div className="space-y-3 pt-2 border-t border-border/50 animate-in fade-in slide-in-from-top-1 duration-200">
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Mail className="w-3 h-3" /> Email
+                            </Label>
+                            <Input 
+                              placeholder="Email for the new user" 
+                              className="h-8 text-sm" 
+                              value={pcfUserEmail}
+                              onChange={(e) => setPcfUserEmail(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Lock className="w-3 h-3" /> Temporary Password
+                            </Label>
+                            <Input 
+                              placeholder="Temporary password" 
+                              className="h-8 text-sm" 
+                              value={pcfUserPassword}
+                              onChange={(e) => setPcfUserPassword(e.target.value)}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Shield className="w-3 h-3" /> Role
+                            </Label>
+                            <Select value={pcfUserRole} onValueChange={setPcfUserRole}>
+                              <SelectTrigger className="h-8 text-sm">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="pcf_leader">PCF Leader</SelectItem>
+                                <SelectItem value="cell_leader">Cell Leader</SelectItem>
+                                <SelectItem value="member">Member</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+
                   <Button className="w-full" onClick={handleAddPcf} disabled={isPending || !pcfName || !selectedGroupId} data-testid="button-add-pcf">
                     <Plus className="w-4 h-4 mr-2" /> Add PCF
                   </Button>

@@ -263,7 +263,7 @@ export async function registerRoutes(
   // PCFs: Admin or Group Pastor (within their group)
   app.post("/api/admin/pcfs", requireAuth, async (req, res) => {
     const role = req.user?.role;
-    const { leaderId, groupId, ...pcfData } = req.body;
+    const { leaderId, groupId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     
     if (role === UserRoles.ADMIN) {
       // Admin can create anywhere
@@ -276,6 +276,30 @@ export async function registerRoutes(
       return res.status(403).json({ message: "You do not have permission to create PCFs" });
     }
     
+    // Validate user creation data if requested
+    if (createUser) {
+      if (!userEmail || !userPassword) {
+        return res.status(400).json({ message: "Email and password are required for user creation" });
+      }
+      
+      const existingUser = await storage.getUserByEmail(userEmail);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      if (leaderId) {
+        const existingUserByMember = await storage.getUserByMemberId(Number(leaderId));
+        if (existingUserByMember) {
+          return res.status(400).json({ message: "This member already has a user account" });
+        }
+      }
+
+      // Restrict role assignment
+      if (role === UserRoles.GROUP_PASTOR && userRole === UserRoles.ADMIN) {
+        return res.status(403).json({ message: "Group Pastors cannot assign Admin role" });
+      }
+    }
+    
     // Validate leader assignment
     const leaderValidation = await validateLeaderAssignment(leaderId);
     if (!leaderValidation.valid) {
@@ -283,7 +307,24 @@ export async function registerRoutes(
     }
     
     const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId });
-    if (leaderId) {
+
+    if (createUser && leaderId) {
+      const member = await storage.getMember(Number(leaderId));
+      if (member) {
+        const hashedPassword = await bcrypt.hash(userPassword, 10);
+        await storage.createUser({
+          email: userEmail,
+          password: hashedPassword,
+          role: userRole || UserRoles.PCF_LEADER,
+          firstName: member.fullName.split(' ')[0],
+          lastName: member.fullName.split(' ').slice(1).join(' '),
+          memberId: member.id,
+          forcePasswordChange: true,
+          groupId,
+          pcfId: pcf.id
+        });
+      }
+    } else if (leaderId) {
       await storage.updateUser(leaderId, { role: UserRoles.PCF_LEADER, pcfId: pcf.id, groupId });
     }
     res.status(201).json(pcf);
