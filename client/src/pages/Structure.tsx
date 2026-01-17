@@ -114,6 +114,9 @@ export default function Structure() {
   const [groupName, setGroupName] = useState("");
   const [groupLeaderId, setGroupLeaderId] = useState("");
   const [createGroupUser, setCreateGroupUser] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [userRole] = useState("group_pastor");
   
   const [pcfName, setPcfName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
@@ -178,11 +181,18 @@ export default function Structure() {
       await apiRequest("POST", "/api/admin/groups", { 
         name: groupName, 
         churchId: hierarchy.church.id,
-        leaderId: groupLeaderId || undefined
+        leaderId: groupLeaderId || undefined,
+        createUser: createGroupUser,
+        userEmail: createGroupUser ? userEmail : undefined,
+        userPassword: createGroupUser ? userPassword : undefined,
+        userRole: createGroupUser ? userRole : undefined
       });
       toast({ title: "Success", description: "Group added successfully" });
       setGroupName("");
       setGroupLeaderId("");
+      setCreateGroupUser(false);
+      setUserEmail("");
+      setUserPassword("");
       queryClient.invalidateQueries({ queryKey: ["/api/hierarchy"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     } catch (err: any) {
@@ -344,19 +354,29 @@ export default function Structure() {
                         <Label className="text-xs text-muted-foreground flex items-center gap-1">
                           <Mail className="w-3 h-3" /> Email
                         </Label>
-                        <Input disabled placeholder="Email for the new user" className="h-8 text-sm" />
+                        <Input 
+                          placeholder="Email for the new user" 
+                          className="h-8 text-sm" 
+                          value={userEmail}
+                          onChange={(e) => setUserEmail(e.target.value)}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground flex items-center gap-1">
                           <Lock className="w-3 h-3" /> Temporary Password
                         </Label>
-                        <Input disabled placeholder="Auto-generated" className="h-8 text-sm" />
+                        <Input 
+                          placeholder="Temporary password" 
+                          className="h-8 text-sm" 
+                          value={userPassword}
+                          onChange={(e) => setUserPassword(e.target.value)}
+                        />
                       </div>
                       <div className="space-y-2">
                         <Label className="text-xs text-muted-foreground flex items-center gap-1">
                           <Shield className="w-3 h-3" /> Role
                         </Label>
-                        <Input disabled value="Group Pastor" className="h-8 text-sm" />
+                        <Input disabled value="Group Pastor" className="h-8 text-sm opacity-70" />
                       </div>
                     </div>
                   )}
