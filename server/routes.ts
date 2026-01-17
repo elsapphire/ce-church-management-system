@@ -229,6 +229,11 @@ export async function registerRoutes(
           return res.status(400).json({ message: "This member already has a user account" });
         }
       }
+
+      // Restrict role assignment: Group Pastor cannot create Admin
+      if (req.user?.role === UserRoles.GROUP_PASTOR && userRole === UserRoles.ADMIN) {
+        return res.status(403).json({ message: "Group Pastors cannot assign Zonal Pastor role" });
+      }
     }
     
     // Validate leader assignment
@@ -413,12 +418,24 @@ export async function registerRoutes(
     try {
       const memberId = Number(req.params.id);
       const { email, password, role } = req.body;
+
+      if (!email || !password || !role) {
+        return res.status(400).json({ message: "Email, password, and role are required" });
+      }
+
+      // Restrict role assignment: Group Pastor cannot create Admin
+      if (req.user?.role === UserRoles.GROUP_PASTOR && role === UserRoles.ADMIN) {
+        return res.status(403).json({ message: "Group Pastors cannot assign Zonal Pastor role" });
+      }
       
       const member = await storage.getMember(memberId);
       if (!member) return res.status(404).json({ message: "Member not found" });
 
-      const existingUser = await storage.getUserByEmail(email);
-      if (existingUser) return res.status(400).json({ message: "Email already in use" });
+      const existingUserByEmail = await storage.getUserByEmail(email);
+      if (existingUserByEmail) return res.status(400).json({ message: "Email already in use" });
+
+      const existingUserByMember = await storage.getUserByMemberId(memberId);
+      if (existingUserByMember) return res.status(400).json({ message: "This member already has a user account" });
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({

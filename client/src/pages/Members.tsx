@@ -216,6 +216,7 @@ export default function Members() {
               ) : (
                 filteredMembers?.map((member) => {
                   const cell = hierarchy?.cells.find(c => c.id === member.cellId);
+                  const hasUserAccount = !!(member as any).userId;
                   return (
                     <tr key={member.id} className="hover:bg-muted/20 transition-colors">
                       <td className="px-6 py-4">
@@ -251,7 +252,7 @@ export default function Members() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {(isAdmin || isGroupPastor) && !(member as any).userId && (
+                          {(isAdmin || isGroupPastor) && !hasUserAccount && (
                             <Button
                               variant="ghost"
                               size="icon"
@@ -264,6 +265,11 @@ export default function Members() {
                             >
                               <ShieldCheck className="w-4 h-4" />
                             </Button>
+                          )}
+                          {hasUserAccount && (
+                            <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground bg-muted rounded">
+                              User Account Active
+                            </div>
                           )}
                           <Button
                             variant="ghost"
