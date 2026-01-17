@@ -198,7 +198,7 @@ export async function registerRoutes(
       return { valid: false, error: "Selected leader does not exist" };
     }
     // Only allow promoting members to prevent privilege escalation
-    if (targetUser.role && targetUser.role !== UserRoles.MEMBER) {
+    if (targetUser.role && targetUser.role !== (UserRoles as any).MEMBER && targetUser.role !== "member") {
       return { valid: false, error: "Selected user already has a leadership role. Only members can be promoted to leaders." };
     }
     return { valid: true };
@@ -288,17 +288,17 @@ export async function registerRoutes(
     res.status(201).json(cell);
   });
 
-  app.delete("/api/admin/groups/:id", requireAuth, requireRoles([UserRoles.ADMIN]), async (req, res) => {
+  app.delete("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
     await storage.deleteGroup(Number(req.params.id));
     res.status(204).send();
   });
 
-  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR]), async (req, res) => {
+  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR] as any), async (req, res) => {
     await storage.deletePcf(Number(req.params.id));
     res.status(204).send();
   });
 
-  app.delete("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER]), async (req, res) => {
+  app.delete("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
     await storage.deleteCell(Number(req.params.id));
     res.status(204).send();
   });
