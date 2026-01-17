@@ -20,15 +20,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { Plus, Search, Trash2, UserCircle } from "lucide-react";
+import { Plus, Search, Trash2, UserCircle, ShieldCheck } from "lucide-react";
 import { useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertMemberSchema, type InsertMember } from "@shared/schema";
+import { insertMemberSchema, type InsertMember, UserRoles } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 export default function Members() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const isAdmin = user?.role === "admin";
   const isGroupPastor = user?.role === "group_pastor";
   const isPcfLeader = user?.role === "pcf_leader";
@@ -38,13 +41,32 @@ export default function Members() {
   const [groupId, setGroupId] = useState<string>(isGroupPastor ? user?.groupId?.toString() || "all" : "all");
   const [pcfId, setPcfId] = useState<string>(isPcfLeader ? user?.pcfId?.toString() || "all" : "all");
   const [cellId, setCellId] = useState<string>(isCellLeader ? user?.cellId?.toString() || "all" : "all");
-  
+
+  const [convertModalOpen, setConvertModalOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [convertPending, setConvertPending] = useState(false);
+
   const { data: members, isLoading } = useMembers({ 
     search, 
     cellId: cellId !== "all" ? Number(cellId) : undefined 
   });
   const { data: hierarchy } = useHierarchy();
   const { mutate: deleteMember } = useDeleteMember();
+
+  const handleConvert = async (data: any) => {
+    if (!selectedMember) return;
+    setConvertPending(true);
+    try {
+      await apiRequest("POST", `/api/admin/members/${selectedMember.id}/convert`, data);
+      toast({ title: "Success", description: "Member converted to user successfully" });
+      setConvertModalOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["/api/members"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || "Failed to convert member", variant: "destructive" });
+    } finally {
+      setConvertPending(false);
+    }
+  };
 
   // Filter logic for cascading selects
   const filteredPcfs = useMemo(() => {
@@ -228,18 +250,34 @@ export default function Members() {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-muted-foreground hover:text-destructive"
-                          onClick={() => {
-                            if (confirm('Are you sure you want to delete this member?')) {
-                              deleteMember(member.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center justify-end gap-1">
+                          {(isAdmin || isGroupPastor) && !(member as any).userId && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-primary hover:text-primary hover:bg-primary/10"
+                              title="Convert to User"
+                              onClick={() => {
+                                setSelectedMember(member);
+                                setConvertModalOpen(true);
+                              }}
+                            >
+                              <ShieldCheck className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              if (confirm('Are you sure you want to delete this member?')) {
+                                deleteMember(member.id);
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -249,7 +287,101 @@ export default function Members() {
           </table>
         </div>
       </div>
+
+      <Dialog open={convertModalOpen} onOpenChange={setConvertModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Convert to User</DialogTitle>
+          </DialogHeader>
+          {selectedMember && (
+            <ConvertUserForm 
+              member={selectedMember} 
+              onSubmit={handleConvert} 
+              isPending={convertPending} 
+              currentUserRole={user?.role}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Layout>
+  );
+}
+
+function ConvertUserForm({ member, onSubmit, isPending, currentUserRole }: { 
+  member: any, 
+  onSubmit: (data: any) => void, 
+  isPending: boolean,
+  currentUserRole?: string
+}) {
+  const form = useForm({
+    defaultValues: {
+      email: member.email || "",
+      password: "",
+      role: UserRoles.CELL_LEADER,
+    }
+  });
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Login Email</FormLabel>
+              <FormControl>
+                <Input placeholder="email@example.com" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="password"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Temporary Password</FormLabel>
+              <FormControl>
+                <Input type="password" placeholder="••••••••" {...field} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={form.control}
+          name="role"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>System Role</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {currentUserRole === UserRoles.ADMIN && (
+                    <SelectItem value={UserRoles.ADMIN}>Admin</SelectItem>
+                  )}
+                  {(currentUserRole === UserRoles.ADMIN || currentUserRole === UserRoles.GROUP_PASTOR) && (
+                    <SelectItem value={UserRoles.GROUP_PASTOR}>Group Pastor</SelectItem>
+                  )}
+                  <SelectItem value={UserRoles.PCF_LEADER}>PCF Leader</SelectItem>
+                  <SelectItem value={UserRoles.CELL_LEADER}>Cell Leader</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" className="w-full" disabled={isPending}>
+          {isPending ? "Converting..." : "Create User Account"}
+        </Button>
+      </form>
+    </Form>
   );
 }
 

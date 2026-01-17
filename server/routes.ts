@@ -1,3 +1,4 @@
+import bcrypt from "bcrypt";
 import type { Express } from "express";
 import type { Server } from "http";
 import { setupLocalAuth, seedDummyUsers } from "./auth";
@@ -301,6 +302,34 @@ export async function registerRoutes(
   app.delete("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
     await storage.deleteCell(Number(req.params.id));
     res.status(204).send();
+  });
+
+  app.post("/api/admin/members/:id/convert", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR] as any), async (req, res) => {
+    try {
+      const memberId = Number(req.params.id);
+      const { email, password, role } = req.body;
+      
+      const member = await storage.getMember(memberId);
+      if (!member) return res.status(404).json({ message: "Member not found" });
+
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) return res.status(400).json({ message: "Email already in use" });
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        email,
+        password: hashedPassword,
+        role,
+        firstName: member.fullName.split(' ')[0],
+        lastName: member.fullName.split(' ').slice(1).join(' '),
+        memberId: member.id,
+        forcePasswordChange: true,
+      });
+
+      res.status(201).json(user);
+    } catch (err) {
+      res.status(500).json({ message: "Internal server error" });
+    }
   });
 
   // === SEED DATA ===

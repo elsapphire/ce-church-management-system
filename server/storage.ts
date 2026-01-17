@@ -29,6 +29,7 @@ export interface IStorage {
   deleteGroup(id: number): Promise<void>;
   deletePcf(id: number): Promise<void>;
   deleteCell(id: number): Promise<void>;
+  createUser(user: InsertUser): Promise<User>;
 
   // Members
   getMembers(): Promise<Member[]>;
@@ -121,6 +122,11 @@ export class DatabaseStorage implements IStorage {
 
   async deleteCell(id: number): Promise<void> {
     await db.delete(cells).where(eq(cells.id, id));
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const [u] = await db.insert(users).values(user).returning();
+    return u;
   }
 
   // Members
