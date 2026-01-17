@@ -210,7 +210,15 @@ export async function registerRoutes(
     if (req.user?.role !== UserRoles.ADMIN) {
       return res.status(403).json({ message: "Only Zonal Pastor can create groups" });
     }
-    const { leaderId, ...groupData } = req.body;
+    const { leaderId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
+    
+    // Validate user creation data if requested
+    if (createUser) {
+      if (!userEmail || !userPassword) {
+        return res.status(400).json({ message: "Email and password are required for user creation" });
+      }
+      console.log(`[INFO] Group creation requested with user account: ${userEmail} (Role: ${userRole || 'group_pastor'})`);
+    }
     
     // Validate leader assignment
     const leaderValidation = await validateLeaderAssignment(leaderId);
