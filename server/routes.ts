@@ -217,7 +217,18 @@ export async function registerRoutes(
       if (!userEmail || !userPassword) {
         return res.status(400).json({ message: "Email and password are required for user creation" });
       }
-      console.log(`[INFO] Group creation requested with user account: ${userEmail} (Role: ${userRole || 'group_pastor'})`);
+      
+      const existingUser = await storage.getUserByEmail(userEmail);
+      if (existingUser) {
+        return res.status(400).json({ message: "Email already in use" });
+      }
+
+      if (leaderId) {
+        const existingUserByMember = await storage.getUserByMemberId(Number(leaderId));
+        if (existingUserByMember) {
+          return res.status(400).json({ message: "This member already has a user account" });
+        }
+      }
     }
     
     // Validate leader assignment
@@ -227,7 +238,23 @@ export async function registerRoutes(
     }
     
     const group = await storage.createGroup({ ...groupData, leaderId });
-    if (leaderId) {
+
+    if (createUser && leaderId) {
+      const member = await storage.getMember(Number(leaderId));
+      if (member) {
+        const hashedPassword = await bcrypt.hash(userPassword, 10);
+        await storage.createUser({
+          email: userEmail,
+          password: hashedPassword,
+          role: UserRoles.GROUP_PASTOR,
+          firstName: member.fullName.split(' ')[0],
+          lastName: member.fullName.split(' ').slice(1).join(' '),
+          memberId: member.id,
+          forcePasswordChange: true,
+          groupId: group.id
+        });
+      }
+    } else if (leaderId) {
       await storage.updateUser(leaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
     }
     res.status(201).json(group);
