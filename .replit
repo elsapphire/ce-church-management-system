@@ -44,4 +44,4 @@ externalPort = 5000
 [userenv]
 
 [userenv.shared]
-DATABASE_URL = "postgresql://cms_db_7259_user:wJrlQIxJ6Rb0svJlQlYiyFFSBp2voEbG@dpg-d5lu3nmmcj7s73bn4j0g-a.oregon-postgres.render.com/cms_db_7259"
+DATABASE_URL = "postgresql://cms_db_7259_user:wJrlQIxJ6Rb0svJlQlYiyFFSBp2voEbG@dpg-d5lu3nmmcj7s73bn4j0g-a.oregon-postgres.render.com/cms_db_7259?sslmode=require"

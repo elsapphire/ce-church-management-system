@@ -289,7 +289,8 @@ export async function registerRoutes(
   });
 
   // === SEED DATA ===
-  await seedData();
+  // Seed data disabled to maintain clean production state
+  // await seedData();
 
   return httpServer;
 }
