@@ -26,6 +26,9 @@ export interface IStorage {
   getCells(pcfId: number): Promise<Cell[]>;
   getAllCells(): Promise<Cell[]>; // Helper
   createCell(cell: any): Promise<Cell>;
+  deleteGroup(id: number): Promise<void>;
+  deletePcf(id: number): Promise<void>;
+  deleteCell(id: number): Promise<void>;
 
   // Members
   getMembers(): Promise<Member[]>;
@@ -106,6 +109,18 @@ export class DatabaseStorage implements IStorage {
   async createCell(cell: any): Promise<Cell> {
     const [c] = await db.insert(cells).values(cell).returning();
     return c;
+  }
+
+  async deleteGroup(id: number): Promise<void> {
+    await db.delete(groups).where(eq(groups.id, id));
+  }
+
+  async deletePcf(id: number): Promise<void> {
+    await db.delete(pcfs).where(eq(pcfs.id, id));
+  }
+
+  async deleteCell(id: number): Promise<void> {
+    await db.delete(cells).where(eq(cells.id, id));
   }
 
   // Members

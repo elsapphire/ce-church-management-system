@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Network, Layers, Home, Search, UserCircle } from "lucide-react";
+import { Plus, Network, Layers, Home, Search, UserCircle, Trash2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -232,6 +232,21 @@ export default function Structure() {
     }
   };
 
+  const handleDelete = async (type: 'groups' | 'pcfs' | 'cells', id: number) => {
+    if (!confirm(`Are you sure you want to delete this ${type.slice(0, -1)}?`)) return;
+    setIsPending(true);
+    try {
+      await apiRequest("DELETE", `/api/admin/${type}/${id}`);
+      toast({ title: "Success", description: `${type.slice(0, -1).toUpperCase()} deleted successfully` });
+      queryClient.invalidateQueries({ queryKey: ["/api/hierarchy"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || `Failed to delete ${type.slice(0, -1)}`, variant: "destructive" });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
   const getLeaderName = (leaderId: string | null | undefined) => {
     if (!leaderId || !users) return "Not assigned";
     const leader = users.find(u => u.id === leaderId);
@@ -322,6 +337,7 @@ export default function Structure() {
                         <TableHead>Group Name</TableHead>
                         <TableHead>Group Pastor</TableHead>
                         <TableHead>PCFs</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -330,6 +346,20 @@ export default function Structure() {
                           <TableCell className="font-medium">{g.name}</TableCell>
                           <TableCell className="text-muted-foreground">{getLeaderName((g as any).leaderId)}</TableCell>
                           <TableCell>{hierarchy.pcfs.filter(p => p.groupId === g.id).length}</TableCell>
+                          <TableCell>
+                            {isAdmin && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => handleDelete('groups', g.id)}
+                                disabled={isPending}
+                                data-testid={`button-delete-group-${g.id}`}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                       {hierarchy?.groups.length === 0 && (
@@ -409,6 +439,7 @@ export default function Structure() {
                         <TableHead>PCF Leader</TableHead>
                         <TableHead>Parent Group</TableHead>
                         <TableHead>Cells</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -420,6 +451,20 @@ export default function Structure() {
                             <TableCell className="text-muted-foreground">{getLeaderName((p as any).leaderId)}</TableCell>
                             <TableCell className="text-muted-foreground">{group?.name || 'Unknown'}</TableCell>
                             <TableCell>{hierarchy?.cells.filter(c => c.pcfId === p.id).length}</TableCell>
+                            <TableCell>
+                              {(isAdmin || isGroupPastor) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete('pcfs', p.id)}
+                                  disabled={isPending}
+                                  data-testid={`button-delete-pcf-${p.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         );
                       })}
@@ -499,6 +544,7 @@ export default function Structure() {
                         <TableHead>Cell Name</TableHead>
                         <TableHead>Cell Leader</TableHead>
                         <TableHead>Parent PCF</TableHead>
+                        <TableHead className="w-[100px]">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -509,6 +555,20 @@ export default function Structure() {
                             <TableCell className="font-medium">{c.name}</TableCell>
                             <TableCell className="text-muted-foreground">{getLeaderName((c as any).leaderId)}</TableCell>
                             <TableCell className="text-muted-foreground">{pcf?.name || 'Unknown'}</TableCell>
+                            <TableCell>
+                              {(isAdmin || isGroupPastor || isPcfLeader) && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete('cells', c.id)}
+                                  disabled={isPending}
+                                  data-testid={`button-delete-cell-${c.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </TableCell>
                           </TableRow>
                         );
                       })}

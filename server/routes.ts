@@ -288,6 +288,21 @@ export async function registerRoutes(
     res.status(201).json(cell);
   });
 
+  app.delete("/api/admin/groups/:id", requireAuth, requireRoles([UserRoles.ADMIN]), async (req, res) => {
+    await storage.deleteGroup(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR]), async (req, res) => {
+    await storage.deletePcf(Number(req.params.id));
+    res.status(204).send();
+  });
+
+  app.delete("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER]), async (req, res) => {
+    await storage.deleteCell(Number(req.params.id));
+    res.status(204).send();
+  });
+
   // === SEED DATA ===
   // Seed data disabled to maintain clean production state
   // await seedData();
