@@ -387,7 +387,9 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Both current and new passwords are required" });
       }
 
-      const user = await storage.getUser(req.user!.id);
+      const userId = req.user?.id;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+      const user = await storage.getUser(userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
       const isMatch = await bcrypt.compare(currentPassword, user.password);
