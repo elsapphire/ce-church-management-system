@@ -315,7 +315,7 @@ function ConvertUserForm({ member, onSubmit, isPending, currentUserRole }: {
 }) {
   const form = useForm({
     defaultValues: {
-      email: member.email || "",
+      email: (member.email as string | undefined) || "",
       password: "",
       role: UserRoles.CELL_LEADER,
     }
