@@ -1,0 +1,181 @@
+Allow Zonal Pastor (Admin) and Group Pastor accounts to create login users from members, assign roles, and allow first-login password change — without breaking existing role-based access control.
+
+1️⃣ Extend Leadership Creation Forms (Groups & PCFs)
+A. Group Creation Form (Admin / Zonal Pastor only)
+
+When creating or editing a Group and assigning a Group Pastor:
+
+Add a checkbox:
+“Create user account for this member?”
+
+When checked:
+
+Reveal additional fields:
+
+Email (autofill from member record if it exists, editable)
+
+Temporary Password
+
+Role (dropdown)
+Options:
+
+Admin
+
+Group Pastor
+
+PCF Leader
+
+Cell Leader
+
+Rules:
+
+Role dropdown defaults to Group Pastor
+
+Validation:
+
+Email must be unique in users table
+
+Password minimum length enforced
+
+If checkbox is unchecked → existing behaviour remains unchanged
+
+On submit:
+
+If checked:
+
+Create a new user record linked to the member
+
+Hash password before saving
+
+Assign selected role
+
+Link user to the appropriate group
+
+If email already exists as a user → show clear error
+
+B. PCF Creation Form (Group Pastor only)
+
+Same logic as above, but:
+
+Role dropdown defaults to PCF Leader
+
+Group Pastor cannot assign Admin role
+
+User created must be scoped to that Group only
+
+2️⃣ Convert Existing Member → User (Members Page)
+
+On the Members table:
+
+Add an action:
+“Convert to User” (visible only to Admin & Group Pastor)
+
+When clicked:
+
+Open a modal with:
+
+Email (autofilled if member already has one)
+
+Temporary Password
+
+Role dropdown (same role restrictions apply)
+
+On submit:
+
+Create user linked to that member
+
+Do NOT duplicate member record
+
+Enforce unique email constraint
+
+Hide or disable this action if:
+
+Member is already linked to a user account
+
+3️⃣ User ↔ Member Relationship (Backend)
+
+Ensure:
+
+Users table has a memberId foreign key
+
+One-to-one relationship enforced:
+
+One member → max one user account
+
+4️⃣ First-Login Password Change (Profile Page)
+
+Create / enable a Profile page for logged-in users:
+
+Fields:
+
+Current Password
+
+New Password
+
+Confirm New Password
+
+Require password change if:
+
+User was created by Admin / Group Pastor
+
+forcePasswordChange = true flag exists on user
+
+On successful change:
+
+Update password hash
+
+Clear forcePasswordChange flag
+
+Show success feedback
+
+5️⃣ Access Control (Do NOT change existing RBAC logic)
+
+Respect existing role permissions:
+
+Admin:
+
+Can create users for Group Pastors, PCF Leaders, Cell Leaders
+
+Group Pastor:
+
+Can create users for PCF Leaders & Cell Leaders only
+
+PCF Leaders:
+
+❌ No user creation access
+
+Cell Leaders:
+
+❌ No user creation access
+
+Do NOT allow:
+
+Group Pastor creating Admin users
+
+Cross-group access
+
+6️⃣ UX Notes (Lightweight, Fast Mode Safe)
+
+Conditional fields only appear when checkbox is checked
+
+Clear success & error feedback
+
+No redesigns
+
+No auth system rewrite
+
+No database migrations beyond adding memberId + forcePasswordChange if missing
+
+✅ Success Criteria
+
+Admin can add Group Pastor and create login account in one flow
+
+Group Pastor can do same for PCFs
+
+Existing members can be converted to users
+
+Users can change password on first login
+
+No duplicate members or users
+
+RBAC remains intact
