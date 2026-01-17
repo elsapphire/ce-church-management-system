@@ -27,7 +27,7 @@ function LeaderCombobox({
   placeholder 
 }: { 
   value: string; 
-  onValueChange: (val: string) => void; 
+  onValueChange: (member: any) => void; 
   placeholder: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -41,18 +41,16 @@ function LeaderCombobox({
     const items = members.map(m => {
       const linkedUser = users?.find(u => u.memberId === m.id);
       return {
-        id: m.id.toString(),
-        name: m.fullName,
-        email: m.email || "No email",
-        hasUser: !!linkedUser,
+        ...m,
+        isUser: !!linkedUser,
         userId: linkedUser?.id
       };
     });
     
     const lowerSearch = search.toLowerCase();
     return items.filter(i => 
-      i.name.toLowerCase().includes(lowerSearch) || 
-      i.email.toLowerCase().includes(lowerSearch)
+      i.fullName.toLowerCase().includes(lowerSearch) || 
+      (i.email && i.email.toLowerCase().includes(lowerSearch))
     ).slice(0, 50);
   }, [members, users, search]);
 
@@ -86,26 +84,26 @@ function LeaderCombobox({
               {filteredItems.map((item) => (
                 <CommandItem
                   key={item.id}
-                  value={item.id}
+                  value={item.id.toString()}
                   onSelect={() => {
-                    onValueChange(item.id);
+                    onValueChange(item);
                     setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === item.id ? "opacity-100" : "opacity-0"
+                      value === item.id.toString() ? "opacity-100" : "opacity-0"
                     )}
                   />
                   <div className="flex flex-col">
                     <div className="flex items-center gap-2">
-                      <span>{item.name}</span>
-                      {item.hasUser && (
+                      <span>{item.fullName}</span>
+                      {item.isUser && (
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">User</Badge>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">{item.email}</span>
+                    <span className="text-xs text-muted-foreground">{item.email || "No email"}</span>
                   </div>
                 </CommandItem>
               ))}
@@ -130,7 +128,7 @@ export default function Structure() {
   const isPcfLeader = user?.role === "pcf_leader";
 
   const [groupName, setGroupName] = useState("");
-  const [groupLeaderId, setGroupLeaderId] = useState("");
+  const [selectedGroupMember, setSelectedGroupMember] = useState<any>(null);
   const [createGroupUser, setCreateGroupUser] = useState(false);
   const [userEmail, setUserEmail] = useState("");
   const [userPassword, setUserPassword] = useState("");
@@ -138,7 +136,7 @@ export default function Structure() {
   
   const [pcfName, setPcfName] = useState("");
   const [selectedGroupId, setSelectedGroupId] = useState<string>("");
-  const [pcfLeaderId, setPcfLeaderId] = useState("");
+  const [selectedPcfMember, setSelectedPcfMember] = useState<any>(null);
   const [createPcfUser, setCreatePcfUser] = useState(false);
   const [pcfUserEmail, setPcfUserEmail] = useState("");
   const [pcfUserPassword, setPcfUserPassword] = useState("");
@@ -146,33 +144,37 @@ export default function Structure() {
   
   const [cellName, setCellName] = useState("");
   const [selectedPcfId, setSelectedPcfId] = useState<string>("");
-  const [cellLeaderId, setCellLeaderId] = useState("");
-
-  const selectedGroupLeaderMember = useMemo(() => {
-    return members?.find(m => m.id.toString() === groupLeaderId);
-  }, [members, groupLeaderId]);
-
-  const groupLeaderHasUser = useMemo(() => {
-    if (!selectedGroupLeaderMember) return false;
-    return !!users?.find(u => u.memberId === selectedGroupLeaderMember.id);
-  }, [selectedGroupLeaderMember, users]);
-
-  const selectedPcfLeaderMember = useMemo(() => {
-    return members?.find(m => m.id.toString() === pcfLeaderId);
-  }, [members, pcfLeaderId]);
-
-  const pcfLeaderHasUser = useMemo(() => {
-    if (!selectedPcfLeaderMember) return false;
-    return !!users?.find(u => u.memberId === selectedPcfLeaderMember.id);
-  }, [selectedPcfLeaderMember, users]);
+  const [selectedCellMember, setSelectedCellMember] = useState<any>(null);
 
   useEffect(() => {
-    if (groupLeaderHasUser) setCreateGroupUser(false);
-  }, [groupLeaderHasUser]);
+    if (selectedGroupMember?.isUser) {
+      setCreateGroupUser(false);
+    }
+  }, [selectedGroupMember]);
 
   useEffect(() => {
-    if (pcfLeaderHasUser) setCreatePcfUser(false);
-  }, [pcfLeaderHasUser]);
+    if (selectedPcfMember?.isUser) {
+      setCreatePcfUser(false);
+    }
+  }, [selectedPcfMember]);
+
+  const handleGroupLeaderChange = (member: any) => {
+    setSelectedGroupMember(member);
+    setCreateGroupUser(false);
+    setUserEmail(member.email || "");
+    setUserPassword("");
+  };
+
+  const handlePcfLeaderChange = (member: any) => {
+    setSelectedPcfMember(member);
+    setCreatePcfUser(false);
+    setPcfUserEmail(member.email || "");
+    setPcfUserPassword("");
+  };
+
+  const handleCellLeaderChange = (member: any) => {
+    setSelectedCellMember(member);
+  };
 
   const accessibleGroups = useMemo(() => {
     if (!hierarchy) return [];
@@ -229,15 +231,16 @@ export default function Structure() {
       await apiRequest("POST", "/api/admin/groups", { 
         name: groupName, 
         churchId: hierarchy.church.id,
-        leaderId: groupLeaderId || undefined,
+        leaderId: selectedGroupMember?.isUser ? selectedGroupMember.userId : undefined,
         createUser: createGroupUser,
         userEmail: createGroupUser ? userEmail : undefined,
         userPassword: createGroupUser ? userPassword : undefined,
-        userRole: createGroupUser ? userRole : undefined
+        userRole: createGroupUser ? userRole : undefined,
+        memberId: selectedGroupMember?.id
       });
       toast({ title: "Success", description: "Group added successfully" });
       setGroupName("");
-      setGroupLeaderId("");
+      setSelectedGroupMember(null);
       setCreateGroupUser(false);
       setUserEmail("");
       setUserPassword("");
@@ -257,15 +260,16 @@ export default function Structure() {
       await apiRequest("POST", "/api/admin/pcfs", { 
         name: pcfName, 
         groupId: Number(selectedGroupId),
-        leaderId: pcfLeaderId || undefined,
+        leaderId: selectedPcfMember?.isUser ? selectedPcfMember.userId : undefined,
         createUser: createPcfUser,
         userEmail: createPcfUser ? pcfUserEmail : undefined,
         userPassword: createPcfUser ? pcfUserPassword : undefined,
-        userRole: createPcfUser ? pcfUserRole : undefined
+        userRole: createPcfUser ? pcfUserRole : undefined,
+        memberId: selectedPcfMember?.id
       });
       toast({ title: "Success", description: "PCF added successfully" });
       setPcfName("");
-      setPcfLeaderId("");
+      setSelectedPcfMember(null);
       setCreatePcfUser(false);
       setPcfUserEmail("");
       setPcfUserPassword("");
@@ -285,11 +289,12 @@ export default function Structure() {
       await apiRequest("POST", "/api/admin/cells", { 
         name: cellName, 
         pcfId: Number(selectedPcfId),
-        leaderId: cellLeaderId || undefined
+        leaderId: selectedCellMember?.isUser ? selectedCellMember.userId : undefined,
+        memberId: selectedCellMember?.id
       });
       toast({ title: "Success", description: "Cell added successfully" });
       setCellName("");
-      setCellLeaderId("");
+      setSelectedCellMember(null);
       queryClient.invalidateQueries({ queryKey: ["/api/hierarchy"] });
       queryClient.invalidateQueries({ queryKey: ["/api/users"] });
     } catch (err: any) {
@@ -382,18 +387,24 @@ export default function Structure() {
                   <div className="space-y-2">
                     <Label>Group Pastor</Label>
                     <LeaderCombobox
-                      value={groupLeaderId}
-                      onValueChange={setGroupLeaderId}
+                      value={selectedGroupMember?.id?.toString() || ""}
+                      onValueChange={handleGroupLeaderChange}
                       placeholder="Select Member..."
                     />
                   </div>
 
-                  {groupLeaderId && !groupLeaderHasUser && (
+                  {selectedGroupMember && !selectedGroupMember.isUser && (
                     <div className="flex items-center space-x-2 pt-2 animate-in fade-in duration-200">
                       <Checkbox 
                         id="create-user" 
                         checked={createGroupUser} 
-                        onCheckedChange={(checked) => setCreateGroupUser(checked === true)}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          setCreateGroupUser(isChecked);
+                          if (isChecked) {
+                            setUserEmail(selectedGroupMember.email || "");
+                          }
+                        }}
                         data-testid="checkbox-create-user"
                       />
                       <Label 
@@ -405,7 +416,7 @@ export default function Structure() {
                     </div>
                   )}
 
-                  {groupLeaderId && groupLeaderHasUser && (
+                  {selectedGroupMember && selectedGroupMember.isUser && (
                     <div className="pt-2">
                       <Badge variant="secondary" className="w-full justify-center py-1">
                         Member already has a user account
@@ -542,18 +553,24 @@ export default function Structure() {
                   <div className="space-y-2">
                     <Label>PCF Leader</Label>
                     <LeaderCombobox
-                      value={pcfLeaderId}
-                      onValueChange={setPcfLeaderId}
+                      value={selectedPcfMember?.id?.toString() || ""}
+                      onValueChange={handlePcfLeaderChange}
                       placeholder="Select Member..."
                     />
                   </div>
 
-                  {pcfLeaderId && !pcfLeaderHasUser && (
+                  {selectedPcfMember && !selectedPcfMember.isUser && (
                     <div className="flex items-center space-x-2 pt-2 animate-in fade-in duration-200">
                       <Checkbox 
                         id="create-pcf-user" 
                         checked={createPcfUser} 
-                        onCheckedChange={(checked) => setCreatePcfUser(checked === true)}
+                        onCheckedChange={(checked) => {
+                          const isChecked = checked === true;
+                          setCreatePcfUser(isChecked);
+                          if (isChecked) {
+                            setPcfUserEmail(selectedPcfMember.email || "");
+                          }
+                        }}
                         data-testid="checkbox-create-pcf-user"
                       />
                       <Label 
@@ -565,7 +582,7 @@ export default function Structure() {
                     </div>
                   )}
 
-                  {pcfLeaderId && pcfLeaderHasUser && (
+                  {selectedPcfMember && selectedPcfMember.isUser && (
                     <div className="pt-2">
                       <Badge variant="secondary" className="w-full justify-center py-1">
                         Member already has a user account
@@ -716,8 +733,8 @@ export default function Structure() {
                   <div className="space-y-2">
                     <Label>Cell Leader</Label>
                     <LeaderCombobox
-                      value={cellLeaderId}
-                      onValueChange={setCellLeaderId}
+                      value={selectedCellMember?.id?.toString() || ""}
+                      onValueChange={handleCellLeaderChange}
                       placeholder="Select Cell Leader..."
                     />
                   </div>

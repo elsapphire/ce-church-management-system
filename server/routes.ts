@@ -210,7 +210,7 @@ export async function registerRoutes(
     if (req.user?.role !== UserRoles.ADMIN) {
       return res.status(403).json({ message: "Only Zonal Pastor can create groups" });
     }
-    const { leaderId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
+    const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
     
     // Validate user creation data if requested
     if (createUser) {
@@ -223,8 +223,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email already in use" });
       }
 
-      if (leaderId) {
-        const existingUserByMember = await storage.getUserByMemberId(Number(leaderId));
+      if (memberId) {
+        const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
         if (existingUserByMember) {
           return res.status(400).json({ message: "This member already has a user account" });
         }
@@ -244,8 +244,8 @@ export async function registerRoutes(
     
     const group = await storage.createGroup({ ...groupData, leaderId });
 
-    if (createUser && leaderId) {
-      const member = await storage.getMember(Number(leaderId));
+    if (createUser && memberId) {
+      const member = await storage.getMember(Number(memberId));
       if (member) {
         const hashedPassword = await bcrypt.hash(userPassword, 10);
         await storage.createUser({
@@ -268,7 +268,7 @@ export async function registerRoutes(
   // PCFs: Admin or Group Pastor (within their group)
   app.post("/api/admin/pcfs", requireAuth, async (req, res) => {
     const role = req.user?.role;
-    const { leaderId, groupId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
+    const { leaderId, memberId, groupId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     
     if (role === UserRoles.ADMIN) {
       // Admin can create anywhere
@@ -292,8 +292,8 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Email already in use" });
       }
 
-      if (leaderId) {
-        const existingUserByMember = await storage.getUserByMemberId(Number(leaderId));
+      if (memberId) {
+        const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
         if (existingUserByMember) {
           return res.status(400).json({ message: "This member already has a user account" });
         }
@@ -313,8 +313,8 @@ export async function registerRoutes(
     
     const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId });
 
-    if (createUser && leaderId) {
-      const member = await storage.getMember(Number(leaderId));
+    if (createUser && memberId) {
+      const member = await storage.getMember(Number(memberId));
       if (member) {
         const hashedPassword = await bcrypt.hash(userPassword, 10);
         await storage.createUser({
@@ -338,7 +338,7 @@ export async function registerRoutes(
   // Cells: Admin, Group Pastor (in their group), PCF Leader (in their PCF)
   app.post("/api/admin/cells", requireAuth, async (req, res) => {
     const role = req.user?.role;
-    const { leaderId, pcfId, ...cellData } = req.body;
+    const { leaderId, memberId, pcfId, ...cellData } = req.body;
     
     if (role === UserRoles.ADMIN) {
       // Admin can create anywhere
