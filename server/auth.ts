@@ -155,7 +155,7 @@ export function setupLocalAuth(app: Express) {
 export async function seedDummyUsers() {
   const dummyUsers = [
     {
-      email: "admin@church.org",
+      email: "admin@cecms.com",
       username: "admin",
       password: "admin123",
       firstName: "Zonal",

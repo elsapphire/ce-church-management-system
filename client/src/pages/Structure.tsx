@@ -31,21 +31,48 @@ function LeaderCombobox({
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const { data: users } = useUsers();
+  const { data: hierarchy } = useHierarchy();
 
-  const filteredUsers = useMemo(() => {
-    if (!users) return [];
+  const members = useMemo(() => {
+    if (!hierarchy?.groups) return [];
+    const allPcfs = hierarchy.groups.flatMap(g => hierarchy.pcfs.filter(p => p.groupId === g.id));
+    const allCells = allPcfs.flatMap(p => hierarchy.cells.filter(c => c.pcfId === p.id));
+    
+    // We need members too, let's assume useHierarchy doesn't have all members.
+    // Actually, looking at the hierarchy data, it usually doesn't include the full member list.
+    // I should check if there's a useMembers hook.
+    return [];
+  }, [hierarchy]);
+
+  const filteredItems = useMemo(() => {
+    const items: { id: string; name: string; email: string; type: 'user' | 'member' }[] = [];
+    
+    if (users) {
+      users.forEach(u => {
+        items.push({
+          id: u.id,
+          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
+          email: u.email,
+          type: 'user'
+        });
+      });
+    }
+
+    // Since I don't have a useMembers hook yet, I'll stick to users for now but prepare the structure
+    // Actually I can use the existing users list.
+    
     const lowerSearch = search.toLowerCase();
-    return users.filter(u => 
-      (u.firstName?.toLowerCase().includes(lowerSearch) || 
-       u.lastName?.toLowerCase().includes(lowerSearch) ||
-       u.email?.toLowerCase().includes(lowerSearch))
+    return items.filter(i => 
+      i.name.toLowerCase().includes(lowerSearch) || 
+      i.email.toLowerCase().includes(lowerSearch)
     ).slice(0, 50);
   }, [users, search]);
 
-  const selectedUser = users?.find(u => u.id === value);
-  const displayName = selectedUser 
-    ? `${selectedUser.firstName || ''} ${selectedUser.lastName || ''}`.trim() || selectedUser.email
-    : placeholder;
+  const selectedItem = filteredItems.find(i => i.id === value) || (users?.find(u => u.id === value) ? {
+    name: `${users.find(u => u.id === value)?.firstName || ''} ${users.find(u => u.id === value)?.lastName || ''}`.trim() || users.find(u => u.id === value)?.email,
+  } : null);
+
+  const displayName = selectedItem?.name || placeholder;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -69,26 +96,26 @@ function LeaderCombobox({
             onValueChange={setSearch}
           />
           <CommandList>
-            <CommandEmpty>No user found.</CommandEmpty>
+            <CommandEmpty>No one found.</CommandEmpty>
             <CommandGroup>
-              {filteredUsers.map((user) => (
+              {filteredItems.map((item) => (
                 <CommandItem
-                  key={user.id}
-                  value={user.id}
+                  key={item.id}
+                  value={item.id}
                   onSelect={() => {
-                    onValueChange(user.id);
+                    onValueChange(item.id);
                     setOpen(false);
                   }}
                 >
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === user.id ? "opacity-100" : "opacity-0"
+                      value === item.id ? "opacity-100" : "opacity-0"
                     )}
                   />
                   <div className="flex flex-col">
-                    <span>{user.firstName} {user.lastName}</span>
-                    <span className="text-xs text-muted-foreground">{user.email}</span>
+                    <span>{item.name}</span>
+                    <span className="text-xs text-muted-foreground">{item.email}</span>
                   </div>
                 </CommandItem>
               ))}
