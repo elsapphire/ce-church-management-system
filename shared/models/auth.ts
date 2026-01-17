@@ -1,7 +1,8 @@
 import { sql } from "drizzle-orm";
-import { index, integer, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import { index, integer, jsonb, pgTable, timestamp, varchar, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
+import { members } from "../schema";
 
 // Role types for RBAC
 export const UserRoles = {
@@ -40,6 +41,8 @@ export const users = pgTable("users", {
   groupId: integer("group_id"),
   pcfId: integer("pcf_id"),
   cellId: integer("cell_id"),
+  memberId: integer("member_id").unique().references(() => members.id),
+  forcePasswordChange: boolean("force_password_change").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

@@ -2,9 +2,9 @@ import { pgTable, text, serial, timestamp, boolean, integer, varchar } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 import { relations } from "drizzle-orm";
-import { users } from "./models/auth";
+import { users, sessions, UserRoles, type User, type InsertUser, type UserRole, type UpsertUser, insertUserSchema, loginSchema } from "./models/auth";
 
-export * from "./models/auth";
+export { users, sessions, UserRoles, type User, type InsertUser, type UserRole, type UpsertUser, insertUserSchema, loginSchema };
 
 // === CHURCH HIERARCHY ===
 export const churches = pgTable("churches", {
@@ -93,7 +93,12 @@ export const cellsRelations = relations(cells, ({ one, many }) => ({
 
 export const membersRelations = relations(members, ({ one, many }) => ({
   cell: one(cells, { fields: [members.cellId], references: [cells.id] }),
+  user: one(users, { fields: [members.id], references: [users.memberId] }),
   attendance: many(attendanceRecords),
+}));
+
+export const usersRelations = relations(users, ({ one }) => ({
+  member: one(members, { fields: [users.memberId], references: [members.id] }),
 }));
 
 export const servicesRelations = relations(services, ({ many }) => ({
