@@ -9,7 +9,8 @@ import {
   Settings,
   LogOut,
   Church,
-  Network
+  Network,
+  User
 } from "lucide-react";
 import logoUrl from "@assets/ce-logo-removebg-preview_1768304044152.png";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/attendance", label: "Attendance", icon: ClipboardCheck },
   { href: "/reports", label: "Reports", icon: BarChart3, roles: ["admin", "group_pastor"] },
   { href: "/structure", label: "Structure", icon: Network, roles: ["admin", "group_pastor", "pcf_leader"] },
+  { href: "/profile", label: "Profile", icon: User },
 ];
 
 export function Sidebar() {

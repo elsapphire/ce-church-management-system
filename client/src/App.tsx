@@ -12,10 +12,11 @@ import Services from "@/pages/Services";
 import Attendance from "@/pages/Attendance";
 import Reports from "@/pages/Reports";
 import Structure from "@/pages/Structure";
+import Profile from "@/pages/Profile";
 import { Loader2 } from "lucide-react";
 
 function ProtectedRoute({ component: Component }: { component: React.ComponentType }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -27,6 +28,10 @@ function ProtectedRoute({ component: Component }: { component: React.ComponentTy
 
   if (!isAuthenticated) {
     return <Redirect to="/login" />;
+  }
+
+  if (user?.forcePasswordChange && window.location.pathname !== "/profile") {
+    return <Redirect to="/profile" />;
   }
 
   return <Component />;
@@ -73,6 +78,9 @@ function Router() {
       </Route>
       <Route path="/structure">
         <ProtectedRoute component={Structure} />
+      </Route>
+      <Route path="/profile">
+        <ProtectedRoute component={Profile} />
       </Route>
       <Route component={NotFound} />
     </Switch>
