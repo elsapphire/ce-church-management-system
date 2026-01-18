@@ -366,7 +366,7 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR] as any), async (req, res) => {
+  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
     await storage.deletePcf(Number(req.params.id));
     res.status(204).send();
   });
@@ -409,7 +409,7 @@ export async function registerRoutes(
     res.json(group);
   });
 
-  app.patch("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR] as any), async (req, res) => {
+  app.patch("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     let assignedLeaderId = leaderId;
 
