@@ -714,6 +714,7 @@ function MemberForm({ form, isPending, isEdit = false }: { form: any, isPending:
 }
 
 function AddMemberDialog() {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateMember();
   const { user } = useAuth();
@@ -781,6 +782,7 @@ function AddMemberDialog() {
 }
 
 function EditMemberDialog({ member }: { member: any }) {
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useUpdateMember();
 
