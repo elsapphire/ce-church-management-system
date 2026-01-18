@@ -372,8 +372,8 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Only Zonal Pastor and Group Pastor can delete PCFs" });
     }
     
+    const pcf = await storage.getPcf(Number(req.params.id));
     if (role === UserRoles.GROUP_PASTOR) {
-      const pcf = await storage.getPcf(Number(req.params.id));
       if (!pcf || pcf.groupId !== req.user?.groupId) {
         return res.status(403).json({ message: "You can only delete PCFs in your own group" });
       }
@@ -390,15 +390,14 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Insufficient permissions to delete cells" });
     }
 
+    const cell = await storage.getCell(Number(req.params.id));
     if (role === UserRoles.GROUP_PASTOR) {
-      const cell = await storage.getCell(Number(req.params.id));
       if (!cell) return res.status(404).json({ message: "Cell not found" });
       const pcf = await storage.getPcf(cell.pcfId);
       if (!pcf || pcf.groupId !== req.user?.groupId) {
         return res.status(403).json({ message: "You can only delete cells in your own group" });
       }
     } else if (role === UserRoles.PCF_LEADER) {
-      const cell = await storage.getCell(Number(req.params.id));
       if (!cell || cell.pcfId !== req.user?.pcfId) {
         return res.status(403).json({ message: "You can only delete cells in your own PCF" });
       }
@@ -447,42 +446,48 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Only Zonal Pastor and Group Pastor can edit PCFs" });
     }
 
+    const pcfId = Number(req.params.id);
+    const existingPcf = await storage.getPcf(pcfId);
+    if (!existingPcf) return res.status(404).json({ message: "PCF not found" });
+
     if (role === UserRoles.GROUP_PASTOR) {
-      const pcf = await storage.getPcf(Number(req.params.id));
-      if (!pcf || pcf.groupId !== req.user?.groupId) {
+      if (existingPcf.groupId !== Number(req.user?.groupId)) {
         return res.status(403).json({ message: "You can only edit PCFs in your own group" });
       }
     }
 
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
-    let assignedLeaderId = leaderId;
-
-    if (memberId && createUser) {
-      const existingUser = await storage.getUserByMemberId(Number(memberId));
-      if (!existingUser) {
-        const member = await storage.getMember(Number(memberId));
-        if (member) {
-          const hashedPassword = await bcrypt.hash(userPassword, 10);
-          const newUser = await storage.createUser({
-            email: userEmail,
-            password: hashedPassword,
-            role: userRole || UserRoles.PCF_LEADER,
-            firstName: member.fullName.split(' ')[0],
-            lastName: member.fullName.split(' ').slice(1).join(' '),
-            memberId: member.id,
-            forcePasswordChange: true
-          });
-          assignedLeaderId = newUser.id;
+    
+    // Demote old leader if changed
+    if (existingPcf.leaderId && existingPcf.leaderId !== leaderId) {
+      const oldLeader = await storage.getMember(existingPcf.leaderId);
+      if (oldLeader && oldLeader.designation === "PCF_LEADER") {
+        await storage.updateMember(oldLeader.id, { designation: "MEMBER" });
+        const oldUser = await storage.getUserByMemberId(oldLeader.id);
+        if (oldUser && oldUser.role === UserRoles.PCF_LEADER) {
+          await storage.updateUser(oldUser.id, { role: UserRoles.CELL_LEADER }); // Fallback to lower role or keep as member
         }
-      } else {
-        assignedLeaderId = existingUser.id;
       }
     }
 
-    const pcf = await storage.updatePcf(Number(req.params.id), { ...pcfData, leaderId: assignedLeaderId });
-    if (assignedLeaderId) {
-      await storage.updateUser(assignedLeaderId, { role: userRole || UserRoles.PCF_LEADER, pcfId: pcf.id });
+    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId });
+
+    // Promote new leader
+    if (leaderId) {
+      const leaderMember = await storage.getMember(leaderId);
+      if (leaderMember) {
+        await storage.updateMember(leaderId, { designation: "PCF_LEADER" as any });
+        const leaderUser = await storage.getUserByMemberId(leaderId);
+        if (leaderUser) {
+          await storage.updateUser(leaderUser.id, { 
+            role: UserRoles.PCF_LEADER, 
+            pcfId: pcf.id,
+            groupId: pcf.groupId 
+          });
+        }
+      }
     }
+
     res.json(pcf);
   });
 
@@ -493,16 +498,17 @@ export async function registerRoutes(
       return res.status(403).json({ message: "Insufficient permissions to edit cells" });
     }
 
+    const cellId = Number(req.params.id);
+    const cellRecord = await storage.getCell(cellId);
+    if (!cellRecord) return res.status(404).json({ message: "Cell not found" });
+
     if (role === UserRoles.GROUP_PASTOR) {
-      const cell = await storage.getCell(Number(req.params.id));
-      if (!cell) return res.status(404).json({ message: "Cell not found" });
-      const pcf = await storage.getPcf(cell.pcfId);
+      const pcf = await storage.getPcf(cellRecord.pcfId);
       if (!pcf || pcf.groupId !== req.user?.groupId) {
         return res.status(403).json({ message: "You can only edit cells in your own group" });
       }
     } else if (role === UserRoles.PCF_LEADER) {
-      const cell = await storage.getCell(Number(req.params.id));
-      if (!cell || cell.pcfId !== req.user?.pcfId) {
+      if (cellRecord.pcfId !== req.user?.pcfId) {
         return res.status(403).json({ message: "You can only edit cells in your own PCF" });
       }
     }
@@ -513,11 +519,11 @@ export async function registerRoutes(
       const user = await storage.getUserByMemberId(Number(memberId));
       if (user) assignedLeaderId = user.id;
     }
-    const cell = await storage.updateCell(Number(req.params.id), { ...cellData, leaderId: assignedLeaderId });
+    const updatedCell = await storage.updateCell(cellId, { ...cellData, leaderId: assignedLeaderId });
     if (assignedLeaderId) {
-      await storage.updateUser(assignedLeaderId, { role: UserRoles.CELL_LEADER, cellId: cell.id });
+      await storage.updateUser(assignedLeaderId, { role: UserRoles.CELL_LEADER, cellId: updatedCell.id });
     }
-    res.json(cell);
+    res.json(updatedCell);
   });
 
   app.post("/api/user/change-password", requireAuth, async (req, res) => {

@@ -17,6 +17,9 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   updateUser(id: string, updates: Partial<User>): Promise<User>;
   
+  getPcf(id: number): Promise<Pcf | undefined>;
+  getCell(id: number): Promise<Cell | undefined>;
+
   // Hierarchy
   getChurch(): Promise<Church | undefined>;
   createChurch(name: string, address: string): Promise<Church>;
@@ -80,6 +83,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Hierarchy
+  async getPcf(id: number): Promise<Pcf | undefined> {
+    const [p] = await db.select().from(pcfs).where(eq(pcfs.id, id));
+    return p;
+  }
+
+  async getCell(id: number): Promise<Cell | undefined> {
+    const [c] = await db.select().from(cells).where(eq(cells.id, id));
+    return c;
+  }
+
   async getChurch(): Promise<Church | undefined> {
     const [church] = await db.select().from(churches).limit(1);
     return church;
