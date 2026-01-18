@@ -120,7 +120,9 @@ export type Service = typeof services.$inferSelect;
 export type AttendanceRecord = typeof attendanceRecords.$inferSelect;
 
 export const insertMemberSchema = createInsertSchema(members).omit({ id: true, createdAt: true });
-export const insertServiceSchema = createInsertSchema(services).omit({ id: true, createdAt: true });
+export const insertServiceSchema = createInsertSchema(services, {
+  date: z.string().transform((str) => new Date(str)),
+}).omit({ id: true, createdAt: true });
 export const insertAttendanceSchema = createInsertSchema(attendanceRecords).omit({ id: true, checkInTime: true });
 export const insertGroupSchema = createInsertSchema(groups).omit({ id: true });
 export const insertPcfSchema = createInsertSchema(pcfs).omit({ id: true });

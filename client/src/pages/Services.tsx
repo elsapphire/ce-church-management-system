@@ -124,8 +124,8 @@ function AddServiceDialog() {
                   <FormControl>
                     <Input 
                       type="date" 
-                      value={field.value ? format(new Date(field.value), 'yyyy-MM-dd') : ''}
-                      onChange={(e) => field.onChange(new Date(e.target.value))}
+                      value={field.value instanceof Date && !isNaN(field.value.getTime()) ? format(field.value, 'yyyy-MM-dd') : (typeof field.value === 'string' ? field.value : '')}
+                      onChange={(e) => field.onChange(e.target.value)}
                     />
                   </FormControl>
                   <FormMessage />
