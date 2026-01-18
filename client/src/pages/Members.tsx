@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Plus, Search, Trash2, UserCircle, ShieldCheck, Edit2 } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertMemberSchema, type InsertMember, UserRoles } from "@shared/schema";
@@ -404,6 +404,22 @@ function MemberForm({ form, isPending, isEdit = false }: { form: any, isPending:
     isEdit ? (hierarchy?.cells.find(c => c.id === form.getValues("cellId"))?.pcfId?.toString() || "") : (isPcfLeader ? user?.pcfId?.toString() || "" : "")
   );
 
+  useEffect(() => {
+    if (hierarchy && isEdit) {
+      const cellId = form.getValues("cellId");
+      if (cellId) {
+        const cell = hierarchy.cells.find(c => c.id === cellId);
+        if (cell) {
+          const pcf = hierarchy.pcfs.find(p => p.id === cell.pcfId);
+          if (pcf) {
+            setSelectedPcfId(pcf.id.toString());
+            setSelectedGroupId(pcf.groupId.toString());
+          }
+        }
+      }
+    }
+  }, [hierarchy, isEdit]);
+
   const filteredPcfs = useMemo(() => {
     if (!hierarchy || !selectedGroupId || selectedGroupId === "none") return [];
     return hierarchy.pcfs.filter(p => p.groupId === Number(selectedGroupId));
@@ -718,8 +734,10 @@ function AddMemberDialog() {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useCreateMember();
   const { user } = useAuth();
+  const { data: hierarchy } = useHierarchy();
 
   const isCellLeader = user?.role === "cell_leader";
+  const isPcfLeader = user?.role === "pcf_leader";
 
   const form = useForm<InsertMember>({
     resolver: zodResolver(insertMemberSchema),
@@ -733,9 +751,15 @@ function AddMemberDialog() {
       designation: "MEMBER",
       birthDay: undefined,
       birthMonth: undefined,
-      cellId: isCellLeader ? user?.cellId : undefined,
+      cellId: isCellLeader ? user?.cellId : (isPcfLeader ? hierarchy?.cells.find((c: any) => c.pcfId === user?.pcfId)?.id : undefined),
     },
   });
+
+  useEffect(() => {
+    if (isCellLeader && user?.cellId) {
+      form.setValue("cellId", user.cellId);
+    }
+  }, [isCellLeader, user, form]);
 
   const onSubmit = (data: InsertMember) => {
     // Sanitize empty strings to null for backend
