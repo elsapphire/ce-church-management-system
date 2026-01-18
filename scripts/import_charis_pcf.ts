@@ -42,7 +42,8 @@ async function runImport() {
   const records = parse(csvContent, {
     columns: true,
     skip_empty_lines: true,
-    trim: true
+    trim: true,
+    from_line: 2 // Start from line 2 to skip the empty header line
   });
 
   // 1. Find Charis PCF
@@ -60,7 +61,7 @@ async function runImport() {
     const rawTitle = (record['TITLE'] || '').trim().toUpperCase();
     const rawName = (record['NAME'] || '').trim();
     const rawSurname = (record['SURNAME'] || '').trim();
-    const rawPhone = (record['PHONE NUMBER'] || record['CELL'] || '').trim();
+    const rawPhone = (record['PHONE NUMBER'] || '').trim();
     const rawDesignation = (record['DESIGNATION '] || record['DESIGNATION'] || 'MEMBER').trim().toUpperCase().replace(' ', '_');
     const rawCell = (record['CELL'] || '').trim();
     const rawEmail = (record['EMAIL ADDRESS'] || '').trim();
@@ -110,7 +111,6 @@ async function runImport() {
     const email = rawEmail || null;
 
     // Check for existing member by email
-    let memberId: number;
     if (email) {
       const [existing] = await db.select().from(members).where(eq(members.email, email)).limit(1);
       if (existing) {
@@ -120,9 +120,7 @@ async function runImport() {
       }
     }
 
-    // Birthday Parsing (Simplified for now, assuming integer fields in schema)
-    // birthDay: integer, birthMonth: integer
-    // OCTOBER 15TH
+    // Birthday Parsing
     let birthDay: number | null = null;
     let birthMonth: number | null = null;
     if (rawBirthday) {
@@ -148,11 +146,10 @@ async function runImport() {
       birthMonth,
       status: 'Active'
     }).returning();
-    memberId = member.id;
+    const memberId = member.id;
 
     // Leadership Logic
     if (designation === 'CELL_LEADER' && cellId) {
-      // Ensure user account
       const userEmail = email || `cell_leader_${memberId}@church.local`;
       const [existingUser] = await db.select().from(users).where(eq(users.email, userEmail)).limit(1);
 
@@ -160,7 +157,7 @@ async function runImport() {
         const tempPassword = crypto.randomBytes(8).toString('hex');
         const hashedPassword = await bcrypt.hash(tempPassword, 10);
         
-        await db.insert(users).values({
+        const [newUser] = await db.insert(users).values({
           email: userEmail,
           password: hashedPassword,
           role: UserRoles.CELL_LEADER,
@@ -171,13 +168,9 @@ async function runImport() {
           pcfId: pcf.id,
           groupId: pcf.groupId,
           forcePasswordChange: true
-        });
+        }).returning();
 
         // Assign as leader of the cell
-        await db.update(cells).set({ leaderId: sql`id::text` }).where(eq(cells.id, cellId)); 
-        // Note: The logic in routes.ts uses user UUID as leaderId in cells table
-        // But we need the actual user ID we just created.
-        const [newUser] = await db.select().from(users).where(eq(users.memberId, memberId)).limit(1);
         await db.update(cells).set({ leaderId: newUser.id }).where(eq(cells.id, cellId));
 
         console.log(`Created user for Cell Leader: ${fullName} (${userEmail}) / Password: ${tempPassword}`);
