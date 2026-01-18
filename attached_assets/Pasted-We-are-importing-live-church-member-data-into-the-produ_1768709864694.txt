@@ -1,0 +1,175 @@
+We are importing live church member data into the production database.
+
+The CSV contains members of:
+
+Group: Immanent in Wisdom 1
+
+PCF: Prolific PCF
+
+Both already exist in the database.
+
+CSV headers (ALL CAPS):
+
+TITLE | NAME | SURNAME | PHONE NUMBER | DESIGNATION | CELL | EMAIL ADDRESS | BIRTHDAY
+
+IMPORT RULES & REQUIRED LOGIC
+1️⃣ Text Normalisation (MANDATORY)
+
+All CSV values are in ALL CAPS. Before inserting:
+
+Convert all names and labels to Proper Case
+
+"SUCCESS ABALAKA" → Success Abalaka
+
+"success abalaka" → Success Abalaka
+
+Apply this to:
+
+TITLE
+
+NAME
+
+SURNAME
+
+DESIGNATION
+
+CELL
+
+Email addresses must be converted to lowercase.
+
+2️⃣ TITLE Validation
+
+TITLE is a controlled dropdown in the system.
+
+Only import if the TITLE matches an existing allowed title.
+
+Do not create new titles.
+
+If a title does not exist:
+
+Skip the row
+
+Log it as a failed import record
+
+3️⃣ DESIGNATION Validation
+
+DESIGNATION must match existing allowed designations.
+
+Do not create new designations.
+
+Skip and log rows with invalid designations.
+
+4️⃣ Cell Handling (Create While Importing)
+
+CELL names in the CSV belong to Prolific PCF.
+
+Cells may not yet exist — Fast Mode must create them on the fly.
+
+Cell name normalisation rules:
+
+Trim spaces
+
+Convert to lowercase for comparison
+
+Remove suffixes like:
+
+" cell"
+
+" group"
+
+Examples:
+
+"Prolific" == "Prolific Cell"
+
+Logic:
+
+If a normalised cell already exists under Prolific PCF → reuse it
+
+If not → create it
+
+Cache created cells during the import to avoid duplicates
+
+5️⃣ Member Creation
+
+For each valid row:
+
+Create a member record with:
+
+Proper-cased full name
+
+Phone number
+
+Email (if present)
+
+Title
+
+Designation
+
+Assigned Cell
+
+Birth Day & Month only (ignore year)
+
+Example:
+
+"15TH MARCH" → birthDay = 15, birthMonth = March
+
+6️⃣ Cell Leader Assignment (IMPORTANT)
+
+If:
+
+DESIGNATION = "Cell Leader"
+
+
+Then:
+
+Assign the member as the leader of the resolved cell
+
+Set:
+
+cells.leaderId = member.id
+
+If the cell already has a leader:
+
+Keep the first leader
+
+Log a warning for the duplicate claim
+
+Do not create user accounts during import
+
+7️⃣ Safety & Stability
+
+Import must be idempotent
+
+Do not crash on bad rows
+
+Continue importing valid rows
+
+Log:
+
+Skipped rows
+
+Validation failures
+
+Duplicate leadership conflicts
+
+STRICT SCOPE
+
+Do NOT modify authentication
+
+Do NOT create user accounts
+
+Do NOT change roles or permissions
+
+Do NOT require Autonomous mode
+
+GOAL
+
+A clean, accurate, production-safe import that:
+
+Preserves church hierarchy
+
+Automatically builds missing cells
+
+Correctly assigns cell leaders
+
+Produces human-readable, properly formatted data
