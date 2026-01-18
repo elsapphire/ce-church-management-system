@@ -750,15 +750,20 @@ function AddMemberDialog() {
       designation: "MEMBER",
       birthDay: undefined,
       birthMonth: undefined,
-      cellId: isCellLeader ? user?.cellId : (isPcfLeader ? hierarchy?.cells.find((c: any) => c.pcfId === user?.pcfId)?.id : undefined),
+      cellId: undefined,
     },
   });
 
   useEffect(() => {
-    if (isCellLeader && user?.cellId) {
-      form.setValue("cellId", user.cellId);
+    if (open) {
+      if (isCellLeader && user?.cellId) {
+        form.setValue("cellId", user.cellId);
+      } else if (isPcfLeader && hierarchy) {
+        const firstCell = hierarchy.cells.find((c: any) => c.pcfId === user?.pcfId);
+        if (firstCell) form.setValue("cellId", firstCell.id);
+      }
     }
-  }, [isCellLeader, user, form]);
+  }, [open, isCellLeader, isPcfLeader, user, hierarchy, form]);
 
   const onSubmit = (data: InsertMember) => {
     console.log("Submitting member data:", data);
@@ -772,7 +777,19 @@ function AddMemberDialog() {
     mutate(sanitizedData, {
       onSuccess: () => {
         setOpen(false);
-        form.reset();
+        form.reset({
+          fullName: "",
+          phone: "",
+          email: "",
+          gender: "Male",
+          title: "",
+          status: "Active",
+          designation: "MEMBER",
+          birthDay: undefined,
+          birthMonth: undefined,
+          cellId: undefined,
+        });
+        toast({ title: "Success", description: "Member created successfully" });
       },
       onError: (err: any) => {
         toast({
@@ -797,7 +814,13 @@ function AddMemberDialog() {
           <DialogTitle>New Member</DialogTitle>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+          <form 
+            onSubmit={(e) => {
+              console.log("Form submit event triggered");
+              form.handleSubmit(onSubmit)(e);
+            }} 
+            className="space-y-4 mt-4"
+          >
             <MemberForm form={form} isPending={isPending} />
             <DialogFooter className="mt-6">
               <Button type="submit" disabled={isPending}>
