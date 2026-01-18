@@ -108,7 +108,7 @@ async function runImport() {
     // Member Creation/Update
     const fullName = `${normalizeName(rawName)} ${normalizeName(rawSurname)}`.trim();
     const phone = normalizePhone(rawPhone);
-    const email = rawEmail || null;
+    const email = rawEmail && rawEmail.trim() !== "" ? rawEmail.trim() : null;
 
     // Check for existing member by email
     if (email) {
