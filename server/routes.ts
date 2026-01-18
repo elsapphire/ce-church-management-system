@@ -456,37 +456,48 @@ export async function registerRoutes(
       }
     }
 
+    console.log('PCF EDIT BODY:', req.body);
+    
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     
-    // Demote old leader if changed
-    const oldLeaderId = existingPcf.leaderId ? Number(existingPcf.leaderId) : null;
-    const newLeaderId = leaderId ? Number(leaderId) : null;
+    // leaderId is a user UUID (string), not a member integer ID
+    const oldLeaderId = existingPcf.leaderId || null;
+    const newLeaderId = leaderId || null;
     
-    if (oldLeaderId && !isNaN(oldLeaderId) && oldLeaderId !== newLeaderId) {
-      const oldLeader = await storage.getMember(oldLeaderId);
-      if (oldLeader && oldLeader.designation === "PCF_LEADER") {
-        await storage.updateMember(oldLeader.id, { designation: "MEMBER" });
-        const oldUser = await storage.getUserByMemberId(oldLeader.id);
-        if (oldUser && oldUser.role === UserRoles.PCF_LEADER) {
-          await storage.updateUser(oldUser.id, { role: UserRoles.CELL_LEADER }); // Fallback to lower role or keep as member
+    console.log('PCF EDIT - oldLeaderId:', oldLeaderId, 'newLeaderId:', newLeaderId);
+    
+    // Step 1: Demote old leader if changed
+    if (oldLeaderId && oldLeaderId !== newLeaderId) {
+      const oldUser = await storage.getUser(oldLeaderId);
+      if (oldUser && oldUser.role === UserRoles.PCF_LEADER) {
+        // Demote old user to CELL_LEADER or MEMBER
+        await storage.updateUser(oldUser.id, { role: UserRoles.CELL_LEADER, pcfId: null });
+        // Also update member designation if linked
+        if (oldUser.memberId) {
+          const oldMember = await storage.getMember(oldUser.memberId);
+          if (oldMember && oldMember.designation === "PCF_LEADER") {
+            await storage.updateMember(oldMember.id, { designation: "MEMBER" });
+          }
         }
       }
     }
 
-    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: newLeaderId && !isNaN(newLeaderId) ? newLeaderId : null });
+    // Step 2: Update PCF with new leaderId
+    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: newLeaderId });
 
-    // Promote new leader
-    if (newLeaderId && !isNaN(newLeaderId)) {
-      const leaderMember = await storage.getMember(newLeaderId);
-      if (leaderMember) {
-        await storage.updateMember(newLeaderId, { designation: "PCF_LEADER" as any });
-        const leaderUser = await storage.getUserByMemberId(newLeaderId);
-        if (leaderUser) {
-          await storage.updateUser(leaderUser.id, { 
-            role: UserRoles.PCF_LEADER, 
-            pcfId: pcf.id,
-            groupId: pcf.groupId 
-          });
+    // Step 3: Promote new leader
+    if (newLeaderId) {
+      const newUser = await storage.getUser(newLeaderId);
+      if (newUser) {
+        // Allow MEMBER or GROUP_PASTOR to become PCF_LEADER
+        await storage.updateUser(newUser.id, { 
+          role: UserRoles.PCF_LEADER, 
+          pcfId: pcf.id,
+          groupId: pcf.groupId 
+        });
+        // Also update member designation if linked
+        if (newUser.memberId) {
+          await storage.updateMember(newUser.memberId, { designation: "PCF_LEADER" as any });
         }
       }
     }
