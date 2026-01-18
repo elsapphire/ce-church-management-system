@@ -62,15 +62,17 @@ export function getSession() {
     tableName: "sessions",
   });
   return session({
-    secret: process.env.SESSION_SECRET || "church-cms-secret-key-change-in-production",
+    name: process.env.SESSION_NAME || "cecms.sid",
+    secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    proxy: true,
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: sessionTtl,
-      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      secure: true,
+      sameSite: "none",
+      maxAge: sessionTtl, // REQUIRED for iPad persistence
     },
   });
 }
@@ -119,6 +121,7 @@ export function setupLocalAuth(app: Express) {
       req.session.userId = user.id;
 
       const { password: _, ...userWithoutPassword } = user;
+      console.info("[auth] user session validated");
       res.json({ user: userWithoutPassword });
     } catch (error) {
       console.error("Login error:", error);

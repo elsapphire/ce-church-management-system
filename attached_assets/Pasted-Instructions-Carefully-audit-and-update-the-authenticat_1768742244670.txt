@@ -1,0 +1,119 @@
+Instructions:
+
+Carefully audit and update the authentication and session configuration to ensure full compatibility with iPadOS WebKit, while preserving all existing functionality.
+
+Backend (Node / Express)
+
+Enable trusted proxy support (required for Render):
+
+app.set("trust proxy", 1);
+
+
+Harden express-session configuration:
+
+Do NOT change session strategy
+
+Do NOT introduce JWTs
+
+Do NOT change session name
+
+Only make cookies WebKit-safe
+
+Ensure the session middleware is configured exactly as follows:
+
+app.use(
+  session({
+    name: process.env.SESSION_NAME || "cecms.sid",
+    secret: process.env.SESSION_SECRET!,
+    resave: false,
+    saveUninitialized: false,
+    proxy: true,
+    cookie: {
+      httpOnly: true,
+      secure: true,
+      sameSite: "none",
+      maxAge: 1000 * 60 * 60 * 24 * 7, // REQUIRED for iPad persistence
+    },
+  })
+);
+
+
+Ensure cookies are not overwritten or cleared:
+
+Search for res.clearCookie
+
+Search for any secondary session middleware
+
+Ensure session middleware is registered before all auth routes
+
+Prevent accidental session resets:
+
+Ensure no route mutates req.session = null
+
+Ensure login route only sets session values (e.g. req.session.userId) and does not recreate the session object
+
+Frontend (React / Vite)
+
+Ensure credentials are always included:
+
+Search all fetch and axios calls to /api/**
+
+Ensure:
+
+credentials: "include"
+
+
+Harden auth hydration logic:
+
+Ensure /api/auth/user is called once on app load
+
+Prevent redirect to /login until the request resolves
+
+Introduce a temporary authLoading state if not already present
+
+Logging & Safety
+
+Remove sensitive console logging:
+
+Remove any console.log(users) or full user arrays
+
+Replace with:
+
+console.info("[auth] user session validated");
+
+
+Do NOT change:
+
+Database schema
+
+Existing users
+
+Roles or permissions
+
+Session storage engine
+
+Deployment config
+
+Validation checklist (must pass)
+
+iPad Safari loads dashboard successfully
+
+iPad Chrome loads dashboard successfully
+
+Desktop login unchanged
+
+iPhone login unchanged
+
+Sessions persist after refresh
+
+No redirect loops
+
+No auth regression
+
+Output required
+
+Apply fixes directly
+
+Report exact files modified
+
+Summarise why this resolves iPad-specific failures
