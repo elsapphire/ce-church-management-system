@@ -7,10 +7,25 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(__dirname, "public");
-  if (!fs.existsSync(distPath)) {
+  // Try multiple possible paths to find the frontend build
+  // In bundled production: dist/index.cjs runs, public is sibling folder
+  // The build outputs to dist/public
+  const possiblePaths = [
+    path.resolve(__dirname, "public"),                    // When running from dist/index.cjs
+    path.resolve(process.cwd(), "dist", "public"),        // Fallback using cwd
+  ];
+
+  let distPath: string | null = null;
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p) && fs.existsSync(path.join(p, "index.html"))) {
+      distPath = p;
+      break;
+    }
+  }
+
+  if (!distPath) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Tried: ${possiblePaths.join(", ")}. Make sure to build the client first.`,
     );
   }
 
