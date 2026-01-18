@@ -228,7 +228,7 @@ export default function Structure() {
     if (!groupName || !hierarchy?.church?.id) {
       toast({ 
         title: "Validation Error", 
-        description: "Group name and Church ID are required. Please ensure a Church is configured.", 
+        description: "Group name and Church ID are required. Please ensure a Church is configured in the system.", 
         variant: "destructive" 
       });
       return;
