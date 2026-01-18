@@ -189,21 +189,7 @@ export async function registerRoutes(
     res.json(safeUsers);
   });
 
-  // === STRUCTURE (Tiered permissions) ===
-  // Helper to validate leader assignment - only allow promoting users who are currently "member" role
-  // This prevents privilege escalation (e.g., reassigning another admin or existing leader)
-  async function validateLeaderAssignment(leaderId: string | undefined): Promise<{ valid: boolean; error?: string }> {
-    if (!leaderId) return { valid: true };
-    const targetUser = await storage.getUser(leaderId);
-    if (!targetUser) {
-      return { valid: false, error: "Selected leader does not exist" };
-    }
-    // Only allow promoting members to prevent privilege escalation
-    if (targetUser.role && targetUser.role !== (UserRoles as any).MEMBER && targetUser.role !== "member") {
-      return { valid: false, error: "Selected user already has a leadership role. Only members can be promoted to leaders." };
-    }
-    return { valid: true };
-  }
+  // Structure: Leader selection validation (REMOVED generic check)
 
   // Groups: Admin only
   app.post("/api/admin/groups", requireAuth, async (req, res) => {
@@ -222,8 +208,14 @@ export async function registerRoutes(
 
       if (user) {
         assignedLeaderId = user.id;
-        // If they already have a user, ensure it's linked correctly even if createUser wasn't checked
-        // but we prioritize existing account
+        // Check for specific group conflict
+        if (user.groupId && user.role === UserRoles.GROUP_PASTOR) {
+          // If trying to assign to a DIFFERENT group than they already have, we might allow it 
+          // but the prompt says: "Block ONLY if user is already Group Pastor of the SAME group."
+          // Since we are CREATING a group here, they can't be assigned to this specific group yet.
+          // However, if they are ALREADY a group pastor of SOME group, we should probably allow it
+          // based on "Users ARE allowed to hold multiple leadership roles across different levels."
+        }
       } else if (createUser) {
         if (!userEmail || !userPassword) {
           return res.status(400).json({ message: "Email and password are required for user creation" });
@@ -246,12 +238,6 @@ export async function registerRoutes(
         });
         assignedLeaderId = newUser.id;
       }
-    }
-    
-    // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
-    if (!leaderValidation.valid) {
-      return res.status(400).json({ message: leaderValidation.error });
     }
     
     // Create Group
@@ -319,12 +305,6 @@ export async function registerRoutes(
       }
     }
     
-    // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
-    if (!leaderValidation.valid) {
-      return res.status(400).json({ message: leaderValidation.error });
-    }
-    
     // Create PCF
     const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId: assignedLeaderId });
 
@@ -369,12 +349,6 @@ export async function registerRoutes(
       if (user) assignedLeaderId = user.id;
     }
 
-    // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
-    if (!leaderValidation.valid) {
-      return res.status(400).json({ message: leaderValidation.error });
-    }
-    
     const cell = await storage.createCell({ ...cellData, pcfId, leaderId: assignedLeaderId });
     if (assignedLeaderId) {
       await storage.updateUser(assignedLeaderId, { 
