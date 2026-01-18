@@ -817,6 +817,8 @@ function AddMemberDialog() {
           <form 
             onSubmit={(e) => {
               console.log("Form submit event triggered");
+              e.preventDefault();
+              e.stopPropagation();
               form.handleSubmit(onSubmit)(e);
             }} 
             className="space-y-4 mt-4"
