@@ -1,4 +1,5 @@
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 import type { Express } from "express";
 import type { Server } from "http";
 import { setupLocalAuth, seedDummyUsers } from "./auth";
@@ -6,8 +7,86 @@ import { storage } from "./storage";
 import { api } from "@shared/routes";
 import { z } from "zod";
 import { loadUser, requireAuth, canMarkAttendance, getAccessibleCellIds, getAccessiblePcfIds, requireRoles } from "./rbac";
-import { UserRoles } from "@shared/models/auth";
+import { UserRoles, type UserRole } from "@shared/models/auth";
 import { pcfs, cells } from "@shared/schema";
+
+// Helper to detect if a string is a UUID
+function isUUID(str: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+}
+
+// Helper to resolve leader: accepts user UUID or member ID, returns user (creating if needed)
+async function resolveLeaderUser(leaderId: string | number | null | undefined): Promise<{ 
+  userId: string | null; 
+  user: any | null;
+  isNewUser: boolean;
+  tempPassword: string | null;
+  email: string | null;
+}> {
+  if (!leaderId) {
+    return { userId: null, user: null, isNewUser: false, tempPassword: null, email: null };
+  }
+  
+  const leaderIdStr = String(leaderId);
+  
+  // Check if it's a UUID (user ID)
+  if (isUUID(leaderIdStr)) {
+    const user = await storage.getUser(leaderIdStr);
+    if (user) {
+      return { userId: user.id, user, isNewUser: false, tempPassword: null, email: user.email };
+    }
+    // UUID but no user found - invalid
+    return { userId: null, user: null, isNewUser: false, tempPassword: null, email: null };
+  }
+  
+  // Not a UUID - treat as member ID
+  const memberId = Number(leaderId);
+  if (isNaN(memberId)) {
+    return { userId: null, user: null, isNewUser: false, tempPassword: null, email: null };
+  }
+  
+  // Check if member has an existing user account
+  const existingUser = await storage.getUserByMemberId(memberId);
+  if (existingUser) {
+    return { userId: existingUser.id, user: existingUser, isNewUser: false, tempPassword: null, email: existingUser.email };
+  }
+  
+  // No user exists - create one from member data
+  const member = await storage.getMember(memberId);
+  if (!member) {
+    return { userId: null, user: null, isNewUser: false, tempPassword: null, email: null };
+  }
+  
+  // Generate temporary password
+  const tempPassword = crypto.randomBytes(16).toString("base64url");
+  const hashedPassword = await bcrypt.hash(tempPassword, 10);
+  
+  // Use member's email or generate a placeholder if missing
+  const email = member.email || `member_${member.id}@temp.local`;
+  
+  // Check if email is already in use
+  const existingByEmail = await storage.getUserByEmail(email);
+  if (existingByEmail) {
+    // Email conflict - use the existing user
+    return { userId: existingByEmail.id, user: existingByEmail, isNewUser: false, tempPassword: null, email: existingByEmail.email };
+  }
+  
+  // Create new user from member
+  const newUser = await storage.createUser({
+    email,
+    password: hashedPassword,
+    role: UserRoles.MEMBER as UserRole,
+    firstName: member.fullName.split(' ')[0],
+    lastName: member.fullName.split(' ').slice(1).join(' ') || '',
+    memberId: member.id,
+    forcePasswordChange: true
+  });
+  
+  console.log(`Auto-created user for member ${member.id} (${member.fullName}) with email: ${email}, tempPassword: ${tempPassword}`);
+  
+  return { userId: newUser.id, user: newUser, isNewUser: true, tempPassword, email };
+}
 
 export async function registerRoutes(
   httpServer: Server,
@@ -408,36 +487,45 @@ export async function registerRoutes(
   });
 
   app.patch("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
-    const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
-    let assignedLeaderId = leaderId;
-
-    if (memberId && createUser) {
-      const existingUser = await storage.getUserByMemberId(Number(memberId));
-      if (!existingUser) {
-        const member = await storage.getMember(Number(memberId));
-        if (member) {
-          const hashedPassword = await bcrypt.hash(userPassword, 10);
-          const newUser = await storage.createUser({
-            email: userEmail,
-            password: hashedPassword,
-            role: UserRoles.GROUP_PASTOR,
-            firstName: member.fullName.split(' ')[0],
-            lastName: member.fullName.split(' ').slice(1).join(' '),
-            memberId: member.id,
-            forcePasswordChange: true
-          });
-          assignedLeaderId = newUser.id;
+    const { leaderId, memberId, ...groupData } = req.body;
+    const existingGroup = await storage.getGroup(Number(req.params.id));
+    if (!existingGroup) return res.status(404).json({ message: "Group not found" });
+    
+    const oldLeaderId = existingGroup.leaderId || null;
+    
+    // Resolve leader: accepts user UUID or member ID, auto-creates user if needed
+    const selectedLeaderId = leaderId || memberId;
+    const { userId: newLeaderId, user: newLeaderUser, isNewUser, tempPassword, email } = await resolveLeaderUser(selectedLeaderId);
+    
+    // Step 1: Demote old leader if changed
+    if (oldLeaderId && oldLeaderId !== newLeaderId) {
+      const oldUser = await storage.getUser(oldLeaderId);
+      if (oldUser && oldUser.role === UserRoles.GROUP_PASTOR) {
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, groupId: null });
+        if (oldUser.memberId) {
+          await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
         }
-      } else {
-        assignedLeaderId = existingUser.id;
       }
     }
 
-    const group = await storage.updateGroup(Number(req.params.id), { ...groupData, leaderId: assignedLeaderId });
-    if (assignedLeaderId) {
-      await storage.updateUser(assignedLeaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+    // Step 2: Update group with new leaderId
+    const group = await storage.updateGroup(Number(req.params.id), { ...groupData, leaderId: newLeaderId });
+    
+    // Step 3: Promote new leader
+    if (newLeaderId && newLeaderUser) {
+      await storage.updateUser(newLeaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+      if (newLeaderUser.memberId) {
+        await storage.updateMember(newLeaderUser.memberId, { designation: "GROUP_PASTOR" });
+      }
     }
-    res.json(group);
+    
+    // Include credentials if a new user was auto-created
+    const response: any = { ...group };
+    if (isNewUser && tempPassword) {
+      response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
+    }
+    
+    res.json(response);
   });
 
   app.patch("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
@@ -458,11 +546,12 @@ export async function registerRoutes(
 
     console.log('PCF EDIT BODY:', req.body);
     
-    const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
-    
-    // leaderId is a user UUID (string), not a member integer ID
+    const { leaderId, memberId, ...pcfData } = req.body;
     const oldLeaderId = existingPcf.leaderId || null;
-    const newLeaderId = leaderId || null;
+    
+    // Resolve leader: accepts user UUID or member ID, auto-creates user if needed
+    const selectedLeaderId = leaderId || memberId;
+    const { userId: newLeaderId, user: newLeaderUser, isNewUser, tempPassword, email } = await resolveLeaderUser(selectedLeaderId);
     
     console.log('PCF EDIT - oldLeaderId:', oldLeaderId, 'newLeaderId:', newLeaderId);
     
@@ -470,39 +559,35 @@ export async function registerRoutes(
     if (oldLeaderId && oldLeaderId !== newLeaderId) {
       const oldUser = await storage.getUser(oldLeaderId);
       if (oldUser && oldUser.role === UserRoles.PCF_LEADER) {
-        // Demote old user to CELL_LEADER or MEMBER
-        await storage.updateUser(oldUser.id, { role: UserRoles.CELL_LEADER, pcfId: null });
-        // Also update member designation if linked
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, pcfId: null, groupId: null });
         if (oldUser.memberId) {
-          const oldMember = await storage.getMember(oldUser.memberId);
-          if (oldMember && oldMember.designation === "PCF_LEADER") {
-            await storage.updateMember(oldMember.id, { designation: "MEMBER" });
-          }
+          await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
         }
       }
     }
 
-    // Step 2: Update PCF with new leaderId
+    // Step 2: Update PCF with new leaderId (user UUID)
     const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: newLeaderId });
 
     // Step 3: Promote new leader
-    if (newLeaderId) {
-      const newUser = await storage.getUser(newLeaderId);
-      if (newUser) {
-        // Allow MEMBER or GROUP_PASTOR to become PCF_LEADER
-        await storage.updateUser(newUser.id, { 
-          role: UserRoles.PCF_LEADER, 
-          pcfId: pcf.id,
-          groupId: pcf.groupId 
-        });
-        // Also update member designation if linked
-        if (newUser.memberId) {
-          await storage.updateMember(newUser.memberId, { designation: "PCF_LEADER" as any });
-        }
+    if (newLeaderId && newLeaderUser) {
+      await storage.updateUser(newLeaderId, { 
+        role: UserRoles.PCF_LEADER, 
+        pcfId: pcf.id,
+        groupId: pcf.groupId 
+      });
+      if (newLeaderUser.memberId) {
+        await storage.updateMember(newLeaderUser.memberId, { designation: "PCF_LEADER" });
       }
     }
 
-    res.json(pcf);
+    // Include credentials if a new user was auto-created
+    const response: any = { ...pcf };
+    if (isNewUser && tempPassword) {
+      response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
+    }
+
+    res.json(response);
   });
 
   app.patch("/api/admin/cells/:id", requireAuth, async (req, res) => {
@@ -528,16 +613,47 @@ export async function registerRoutes(
     }
 
     const { leaderId, memberId, ...cellData } = req.body;
-    let assignedLeaderId = leaderId;
-    if (memberId && !assignedLeaderId) {
-      const user = await storage.getUserByMemberId(Number(memberId));
-      if (user) assignedLeaderId = user.id;
+    const oldLeaderId = cellRecord.leaderId || null;
+    
+    // Resolve leader: accepts user UUID or member ID, auto-creates user if needed
+    const selectedLeaderId = leaderId || memberId;
+    const { userId: newLeaderId, user: newLeaderUser, isNewUser, tempPassword, email } = await resolveLeaderUser(selectedLeaderId);
+    
+    // Step 1: Demote old leader if changed
+    if (oldLeaderId && oldLeaderId !== newLeaderId) {
+      const oldUser = await storage.getUser(oldLeaderId);
+      if (oldUser && oldUser.role === UserRoles.CELL_LEADER) {
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, cellId: null });
+        if (oldUser.memberId) {
+          await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
+        }
+      }
     }
-    const updatedCell = await storage.updateCell(cellId, { ...cellData, leaderId: assignedLeaderId });
-    if (assignedLeaderId) {
-      await storage.updateUser(assignedLeaderId, { role: UserRoles.CELL_LEADER, cellId: updatedCell.id });
+    
+    // Step 2: Update cell with new leaderId (user UUID)
+    const updatedCell = await storage.updateCell(cellId, { ...cellData, leaderId: newLeaderId });
+    
+    // Step 3: Promote new leader
+    if (newLeaderId && newLeaderUser) {
+      const pcf = await storage.getPcf(updatedCell.pcfId);
+      await storage.updateUser(newLeaderId, { 
+        role: UserRoles.CELL_LEADER, 
+        cellId: updatedCell.id,
+        pcfId: updatedCell.pcfId,
+        groupId: pcf?.groupId
+      });
+      if (newLeaderUser.memberId) {
+        await storage.updateMember(newLeaderUser.memberId, { designation: "CELL_LEADER" });
+      }
     }
-    res.json(updatedCell);
+    
+    // Include credentials if a new user was auto-created
+    const response: any = { ...updatedCell };
+    if (isNewUser && tempPassword) {
+      response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
+    }
+    
+    res.json(response);
   });
 
   app.post("/api/user/change-password", requireAuth, async (req, res) => {

@@ -23,6 +23,7 @@ export interface IStorage {
   // Hierarchy
   getChurch(): Promise<Church | undefined>;
   createChurch(name: string, address: string): Promise<Church>;
+  getGroup(id: number): Promise<Group | undefined>;
   getGroups(churchId: number): Promise<Group[]>;
   createGroup(group: any): Promise<Group>;
   getPcfs(groupId: number): Promise<Pcf[]>;
@@ -101,6 +102,11 @@ export class DatabaseStorage implements IStorage {
   async createChurch(name: string, address: string): Promise<Church> {
     const [church] = await db.insert(churches).values({ name, address }).returning();
     return church;
+  }
+
+  async getGroup(id: number): Promise<Group | undefined> {
+    const [g] = await db.select().from(groups).where(eq(groups.id, id));
+    return g;
   }
 
   async getGroups(churchId: number): Promise<Group[]> {
