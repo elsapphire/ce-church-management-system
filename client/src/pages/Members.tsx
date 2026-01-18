@@ -724,12 +724,6 @@ function MemberForm({ form, isPending, isEdit = false }: { form: any, isPending:
           )}
         />
       </div>
-
-      <DialogFooter className="mt-6">
-        <Button type="submit" disabled={isPending}>
-          {isPending ? (isEdit ? "Updating..." : "Creating...") : (isEdit ? "Update Member" : "Create Member")}
-        </Button>
-      </DialogFooter>
     </>
   );
 }
