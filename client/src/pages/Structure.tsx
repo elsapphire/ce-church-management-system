@@ -327,9 +327,16 @@ export default function Structure() {
   };
 
   const getLeaderName = (leaderId: string | null | undefined) => {
-    if (!leaderId || !users) return "Not assigned";
-    const leader = users.find(u => u.id === leaderId);
-    return leader ? `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || leader.email : "Unknown";
+    if (!leaderId) return "Not assigned";
+    // Check members first (since leaders are stored as memberId or userId)
+    const member = members?.find(m => m.id.toString() === leaderId);
+    if (member) return member.fullName;
+    
+    // Check users
+    const leader = users?.find(u => u.id === leaderId);
+    if (leader) return `${leader.firstName || ''} ${leader.lastName || ''}`.trim() || leader.email;
+    
+    return "Unknown";
   };
 
   if (isLoading) {
