@@ -459,8 +459,11 @@ export async function registerRoutes(
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     
     // Demote old leader if changed
-    if (existingPcf.leaderId && Number(existingPcf.leaderId) !== Number(leaderId)) {
-      const oldLeader = await storage.getMember(Number(existingPcf.leaderId));
+    const oldLeaderId = existingPcf.leaderId ? Number(existingPcf.leaderId) : null;
+    const newLeaderId = leaderId ? Number(leaderId) : null;
+    
+    if (oldLeaderId && !isNaN(oldLeaderId) && oldLeaderId !== newLeaderId) {
+      const oldLeader = await storage.getMember(oldLeaderId);
       if (oldLeader && oldLeader.designation === "PCF_LEADER") {
         await storage.updateMember(oldLeader.id, { designation: "MEMBER" });
         const oldUser = await storage.getUserByMemberId(oldLeader.id);
@@ -470,14 +473,14 @@ export async function registerRoutes(
       }
     }
 
-    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: leaderId ? Number(leaderId) : null });
+    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: newLeaderId && !isNaN(newLeaderId) ? newLeaderId : null });
 
     // Promote new leader
-    if (leaderId) {
-      const leaderMember = await storage.getMember(Number(leaderId));
+    if (newLeaderId && !isNaN(newLeaderId)) {
+      const leaderMember = await storage.getMember(newLeaderId);
       if (leaderMember) {
-        await storage.updateMember(Number(leaderId), { designation: "PCF_LEADER" as any });
-        const leaderUser = await storage.getUserByMemberId(Number(leaderId));
+        await storage.updateMember(newLeaderId, { designation: "PCF_LEADER" as any });
+        const leaderUser = await storage.getUserByMemberId(newLeaderId);
         if (leaderUser) {
           await storage.updateUser(leaderUser.id, { 
             role: UserRoles.PCF_LEADER, 
