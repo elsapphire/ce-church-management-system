@@ -762,12 +762,14 @@ function AddMemberDialog() {
   }, [isCellLeader, user, form]);
 
   const onSubmit = (data: InsertMember) => {
+    console.log("Submitting member data:", data);
     // Sanitize empty strings to null for backend
     const sanitizedData = {
       ...data,
       email: data.email?.trim() === "" ? null : data.email,
       phone: data.phone?.trim() === "" ? null : data.phone,
     };
+    console.log("Sanitized member payload:", sanitizedData);
     mutate(sanitizedData, {
       onSuccess: () => {
         setOpen(false);

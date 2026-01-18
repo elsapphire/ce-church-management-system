@@ -152,7 +152,11 @@ export async function registerRoutes(
 
   app.post(api.members.create.path, requireAuth, async (req, res) => {
     try {
-      const input = api.members.create.input.parse(req.body);
+      console.log("POST /api/members body:", req.body);
+      const input = api.members.create.input.parse({
+        ...req.body,
+        email: req.body.email?.trim() || null
+      });
       const role = req.user?.role;
       
       // Tiered member creation permissions
@@ -182,8 +186,9 @@ export async function registerRoutes(
       const member = await storage.createMember(input);
       res.status(201).json(member);
     } catch (err: any) {
+      console.error("Member creation error detail:", err);
       if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message });
+        return res.status(400).json({ message: err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') });
       }
       if (err.message === "A member with this email already exists") {
         return res.status(400).json({ message: err.message });
@@ -195,7 +200,10 @@ export async function registerRoutes(
 
   app.put(api.members.update.path, requireAuth, async (req, res) => {
     try {
-        const input = api.members.update.input.parse(req.body);
+        const input = api.members.update.input.parse({
+          ...req.body,
+          email: req.body.email?.trim() || null
+        });
         const member = await storage.updateMember(Number(req.params.id), input);
         res.json(member);
     } catch (err: any) {

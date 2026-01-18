@@ -1,0 +1,129 @@
+Problem
+
+The Create Member button does nothing when clicked:
+
+No network request is sent
+
+No UI feedback
+
+No error toast
+
+No console error visible
+
+This started after recent imports + validation changes
+
+Required Debug & Fix Steps (DO NOT SKIP)
+1. Frontend: Button & Form Submission
+
+Inspect the Create Member button:
+
+Ensure it is:
+
+Inside a <form>
+
+Has type="submit" OR a valid onClick={handleSubmit}
+
+Verify the submit handler is actually bound
+
+Ensure preventDefault() is not blocking execution incorrectly
+
+2. Frontend: Validation Logic
+
+Audit all frontend validation guards:
+
+Check for early return statements
+
+Especially around:
+
+email
+
+designation
+
+cellId
+
+Confirm:
+
+Email is optional
+
+Empty email is sent as null, not ""
+
+Ensure the submit button is not permanently disabled
+
+Inspect disabled={...} conditions
+
+3. Frontend: Payload Inspection
+
+Before submission:
+
+Log the payload being sent to /api/members
+
+Confirm:
+
+email is either a valid string or null
+
+No undefined values exist
+
+Required fields (firstName, lastName, phone) exist
+
+4. Backend: Route Execution
+
+Inspect POST /api/members:
+
+Add temporary logging to confirm the route is hit
+
+Ensure:
+
+Validation middleware is not rejecting silently
+
+No role-based guard is blocking admin / group pastor
+
+5. Database Constraint Safety
+
+Ensure backend logic:
+
+Converts empty email strings to null
+
+Prevents duplicate empty emails from violating:
+
+members_email_unique
+
+Explicit Fixes to Apply
+
+Normalize email input:
+
+email: email?.trim() || null
+
+
+Remove any validation that treats email as mandatory
+
+Ensure error responses are surfaced to the UI via toast
+
+Success Criteria
+
+Clicking Create Member:
+
+Sends a POST request
+
+Creates a member even with missing optional fields
+
+Shows success feedback
+
+App does not crash
+
+No silent failures
+
+Important Instruction
+
+❗ Do not refactor unrelated files
+❗ Do not introduce new schemas
+❗ Fix only what blocks member creation
+
+Expected Outcome
+
+Admins and leaders can:
+
+Create members with partial data
+
+Safely proceed with imports and onboarding
+
+Continue normal CMS operations
