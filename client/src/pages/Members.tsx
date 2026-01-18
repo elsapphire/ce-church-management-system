@@ -109,18 +109,6 @@ export default function Members() {
     return true;
   });
 
-  const accessibleCellsForAdd = useMemo(() => {
-    if (!hierarchy) return [];
-    if (isAdmin) return hierarchy.cells;
-    if (isGroupPastor) {
-      const groupPcfs = hierarchy.pcfs.filter(p => p.groupId === user?.groupId).map(p => p.id);
-      return hierarchy.cells.filter(c => groupPcfs.includes(c.pcfId));
-    }
-    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user?.pcfId);
-    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user?.cellId);
-    return [];
-  }, [hierarchy, isAdmin, isGroupPastor, isPcfLeader, isCellLeader, user]);
-  
   return (
     <Layout>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -128,7 +116,7 @@ export default function Members() {
           <h1 className="text-3xl font-bold font-display tracking-tight">Members</h1>
           <p className="text-muted-foreground">Manage directory and member details.</p>
         </div>
-        <AddMemberDialog accessibleCells={accessibleCellsForAdd} />
+        <AddMemberDialog />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -305,7 +293,7 @@ export default function Members() {
               member={selectedMember} 
               onSubmit={handleConvert} 
               isPending={convertPending} 
-              currentUserRole={user?.role}
+              currentUserRole={user?.role || undefined}
             />
           )}
         </DialogContent>
@@ -392,15 +380,344 @@ function ConvertUserForm({ member, onSubmit, isPending, currentUserRole }: {
   );
 }
 
-function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
-  const [open, setOpen] = useState(false);
-  const { mutate, isPending } = useCreateMember();
+function MemberForm({ form, isPending, isEdit = false }: { form: any, isPending: boolean, isEdit?: boolean }) {
   const { user } = useAuth();
   const { data: hierarchy } = useHierarchy();
 
-  const isAdmin = user?.role === "admin";
   const isGroupPastor = user?.role === "group_pastor";
   const isPcfLeader = user?.role === "pcf_leader";
+  const isCellLeader = user?.role === "cell_leader";
+
+  const months = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+  const days = Array.from({ length: 31 }, (_, i) => i + 1);
+  const designations = [
+    "MEMBER", "CELL_LEADER", "PCF_LEADER", "GROUP_PASTOR", "PASTORAL_ASSISTANT"
+  ];
+
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(
+    isEdit ? (hierarchy?.pcfs.find(p => p.id === hierarchy?.cells.find(c => c.id === form.getValues("cellId"))?.pcfId)?.groupId?.toString() || "") : (isGroupPastor ? user?.groupId?.toString() || "" : "")
+  );
+  const [selectedPcfId, setSelectedPcfId] = useState<string>(
+    isEdit ? (hierarchy?.cells.find(c => c.id === form.getValues("cellId"))?.pcfId?.toString() || "") : (isPcfLeader ? user?.pcfId?.toString() || "" : "")
+  );
+
+  const filteredPcfs = useMemo(() => {
+    if (!hierarchy || !selectedGroupId || selectedGroupId === "none") return [];
+    return hierarchy.pcfs.filter(p => p.groupId === Number(selectedGroupId));
+  }, [hierarchy, selectedGroupId]);
+
+  const filteredCells = useMemo(() => {
+    if (!hierarchy) return [];
+    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user?.cellId);
+    if (selectedPcfId && selectedPcfId !== "none") return hierarchy.cells.filter(c => c.pcfId === Number(selectedPcfId));
+    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user?.pcfId);
+    return [];
+  }, [hierarchy, selectedPcfId, isCellLeader, isPcfLeader, user]);
+
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="title"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Title</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || undefined}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select title" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Pastor">Pastor</SelectItem>
+                  <SelectItem value="Deacon">Deacon</SelectItem>
+                  <SelectItem value="Deaconess">Deaconess</SelectItem>
+                  <SelectItem value="Brother">Brother</SelectItem>
+                  <SelectItem value="Sister">Sister</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="designation"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Designation</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || "MEMBER"}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select designation" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {designations.map(d => (
+                    <SelectItem key={d} value={d}>{d.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <FormField
+        control={form.control}
+        name="fullName"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Full Name</FormLabel>
+            <FormControl>
+              <Input placeholder="John Doe" {...field} />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <FormField
+          control={form.control}
+          name="email"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Email Address</FormLabel>
+              <FormControl>
+                <Input type="email" placeholder="john@example.com" {...field} value={field.value || ''} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone</FormLabel>
+              <FormControl>
+                <Input placeholder="+1234567890" {...field} value={field.value || ''} />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <FormLabel>Birthday</FormLabel>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="birthDay"
+            render={({ field }) => (
+              <FormItem>
+                <Select onValueChange={(val) => field.onChange(val === "none" ? undefined : Number(val))} value={field.value?.toString() || "none"}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Day" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Day</SelectItem>
+                    {days.map(d => (
+                      <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="birthMonth"
+            render={({ field }) => (
+              <FormItem>
+                <Select onValueChange={(val) => field.onChange(val === "none" ? undefined : val)} value={field.value || "none"}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Month" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">Month</SelectItem>
+                    {months.map(m => (
+                      <SelectItem key={m} value={m}>{m}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </FormItem>
+            )}
+          />
+        </div>
+      </div>
+
+      <FormField
+        control={form.control}
+        name="gender"
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel>Gender</FormLabel>
+            <Select onValueChange={field.onChange} value={field.value}>
+              <FormControl>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+              </FormControl>
+              <SelectContent>
+                <SelectItem value="Male">Male</SelectItem>
+                <SelectItem value="Female">Female</SelectItem>
+              </SelectContent>
+            </Select>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+
+      {isEdit && (
+        <FormField
+          control={form.control}
+          name="status"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Status</FormLabel>
+              <Select onValueChange={field.onChange} value={field.value || "Active"}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select status" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      )}
+
+      <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
+        <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Placement</h4>
+        
+        {!isGroupPastor && !isPcfLeader && !isCellLeader && (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">Group</Label>
+              <Select value={selectedGroupId || "none"} onValueChange={(val) => {
+                setSelectedGroupId(val === "none" ? "" : val);
+                setSelectedPcfId("");
+                form.setValue("cellId", undefined as any);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select Group</SelectItem>
+                  {hierarchy?.groups.map(g => (
+                    <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">PCF</Label>
+              <Select value={selectedPcfId || "none"} onValueChange={(val) => {
+                setSelectedPcfId(val === "none" ? "" : val);
+                form.setValue("cellId", undefined as any);
+              }}>
+                <SelectTrigger disabled={!selectedGroupId || selectedGroupId === "none"}>
+                  <SelectValue placeholder="Select PCF" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Select PCF</SelectItem>
+                  {filteredPcfs.map(p => (
+                    <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+
+        {isGroupPastor && (
+          <div className="space-y-2">
+            <Label className="text-xs">Group: {hierarchy?.groups.find(g => g.id === user?.groupId)?.name}</Label>
+            <Select value={selectedPcfId || "none"} onValueChange={(val) => {
+              setSelectedPcfId(val === "none" ? "" : val);
+              form.setValue("cellId", undefined as any);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select PCF" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Select PCF</SelectItem>
+                {hierarchy?.pcfs.filter(p => p.groupId === user?.groupId).map(p => (
+                  <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {isPcfLeader && (
+          <div className="space-y-2">
+            <Label className="text-xs">PCF: {hierarchy?.pcfs.find(p => p.id === user?.pcfId)?.name}</Label>
+          </div>
+        )}
+
+        <FormField
+          control={form.control}
+          name="cellId"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel className="text-xs">Cell Group</FormLabel>
+              <Select onValueChange={(val) => field.onChange(val === "none" ? undefined : Number(val))} value={field.value?.toString() || "none"}>
+                <FormControl>
+                  <SelectTrigger disabled={!isCellLeader && (!selectedPcfId || selectedPcfId === "none") && !isPcfLeader}>
+                    <SelectValue placeholder="Select Cell" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="none">Select Cell</SelectItem>
+                  {filteredCells.map((cell) => (
+                    <SelectItem key={cell.id} value={cell.id.toString()}>
+                      {cell.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+
+      <DialogFooter className="mt-6">
+        <Button type="submit" disabled={isPending}>
+          {isPending ? (isEdit ? "Updating..." : "Creating...") : (isEdit ? "Update Member" : "Create Member")}
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+function AddMemberDialog() {
+  const [open, setOpen] = useState(false);
+  const { mutate, isPending } = useCreateMember();
+  const { user } = useAuth();
+
   const isCellLeader = user?.role === "cell_leader";
 
   const form = useForm<InsertMember>({
@@ -415,46 +732,15 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
       designation: "MEMBER",
       birthDay: undefined,
       birthMonth: undefined,
-      cellId: isCellLeader ? user.cellId : undefined,
+      cellId: isCellLeader ? user?.cellId : undefined,
     },
   });
-
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const designations = [
-    "MEMBER", "CELL_LEADER", "PCF_LEADER", "GROUP_PASTOR", "PASTORAL_ASSISTANT"
-  ];
-
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(
-    isGroupPastor ? user.groupId?.toString() || "" : ""
-  );
-  const [selectedPcfId, setSelectedPcfId] = useState<string>(
-    isPcfLeader ? user.pcfId?.toString() || "" : ""
-  );
-
-  const filteredPcfs = useMemo(() => {
-    if (!hierarchy || !selectedGroupId) return [];
-    return hierarchy.pcfs.filter(p => p.groupId === Number(selectedGroupId));
-  }, [hierarchy, selectedGroupId]);
-
-  const filteredCells = useMemo(() => {
-    if (!hierarchy) return [];
-    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user.cellId);
-    if (selectedPcfId) return hierarchy.cells.filter(c => c.pcfId === Number(selectedPcfId));
-    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user.pcfId);
-    return [];
-  }, [hierarchy, selectedPcfId, isCellLeader, isPcfLeader, user]);
 
   const onSubmit = (data: InsertMember) => {
     mutate(data, {
       onSuccess: () => {
         setOpen(false);
         form.reset();
-        if (!isGroupPastor) setSelectedGroupId("");
-        if (!isPcfLeader) setSelectedPcfId("");
       },
     });
   };
@@ -473,266 +759,7 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select title" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Pastor">Pastor</SelectItem>
-                        <SelectItem value="Deacon">Deacon</SelectItem>
-                        <SelectItem value="Deaconess">Deaconess</SelectItem>
-                        <SelectItem value="Brother">Brother</SelectItem>
-                        <SelectItem value="Sister">Sister</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="designation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Designation</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || "MEMBER"}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select designation" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {designations.map(d => (
-                          <SelectItem key={d} value={d}>{d.replace('_', ' ')}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="john@example.com" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1234567890" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <FormLabel>Birthday</FormLabel>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="birthDay"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Day" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {days.map(d => (
-                            <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="birthMonth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Month" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {months.map(m => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gender</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Placement</h4>
-              
-              {!isGroupPastor && !isPcfLeader && !isCellLeader && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Group</Label>
-                    <Select value={selectedGroupId} onValueChange={(val) => {
-                      setSelectedGroupId(val);
-                      setSelectedPcfId("");
-                      form.setValue("cellId", undefined as any);
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hierarchy?.groups.map(g => (
-                          <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">PCF</Label>
-                    <Select value={selectedPcfId} onValueChange={(val) => {
-                      setSelectedPcfId(val);
-                      form.setValue("cellId", undefined as any);
-                    }}>
-                      <SelectTrigger disabled={!selectedGroupId}>
-                        <SelectValue placeholder="Select PCF" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredPcfs.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {isGroupPastor && (
-                <div className="space-y-2">
-                  <Label className="text-xs">Group: {hierarchy?.groups.find(g => g.id === user.groupId)?.name}</Label>
-                  <Select value={selectedPcfId} onValueChange={(val) => {
-                    setSelectedPcfId(val);
-                    form.setValue("cellId", undefined as any);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select PCF" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hierarchy?.pcfs.filter(p => p.groupId === user.groupId).map(p => (
-                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {isPcfLeader && (
-                <div className="space-y-2">
-                  <Label className="text-xs">PCF: {hierarchy?.pcfs.find(p => p.id === user.pcfId)?.name}</Label>
-                </div>
-              )}
-
-              <FormField
-                control={form.control}
-                name="cellId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Cell Group</FormLabel>
-                    <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
-                      <FormControl>
-                        <SelectTrigger disabled={!isCellLeader && !selectedPcfId && !isPcfLeader}>
-                          <SelectValue placeholder="Select Cell" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredCells.map((cell) => (
-                          <SelectItem key={cell.id} value={cell.id.toString()}>
-                            {cell.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Creating..." : "Create Member"}
-              </Button>
-            </DialogFooter>
+            <MemberForm form={form} isPending={isPending} />
           </form>
         </Form>
       </DialogContent>
@@ -743,13 +770,6 @@ function AddMemberDialog({ accessibleCells }: { accessibleCells: any[] }) {
 function EditMemberDialog({ member }: { member: any }) {
   const [open, setOpen] = useState(false);
   const { mutate, isPending } = useUpdateMember();
-  const { user } = useAuth();
-  const { data: hierarchy } = useHierarchy();
-
-  const isAdmin = user?.role === "admin";
-  const isGroupPastor = user?.role === "group_pastor";
-  const isPcfLeader = user?.role === "pcf_leader";
-  const isCellLeader = user?.role === "cell_leader";
 
   const form = useForm<InsertMember>({
     resolver: zodResolver(insertMemberSchema),
@@ -766,38 +786,6 @@ function EditMemberDialog({ member }: { member: any }) {
       cellId: member.cellId,
     },
   });
-
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  const days = Array.from({ length: 31 }, (_, i) => i + 1);
-  const designations = [
-    "MEMBER", "CELL_LEADER", "PCF_LEADER", "GROUP_PASTOR", "PASTORAL_ASSISTANT"
-  ];
-
-  const currentCell = hierarchy?.cells.find(c => c.id === member.cellId);
-  const currentPcf = hierarchy?.pcfs.find(p => p.id === currentCell?.pcfId);
-  
-  const [selectedGroupId, setSelectedGroupId] = useState<string>(
-    currentPcf?.groupId?.toString() || ""
-  );
-  const [selectedPcfId, setSelectedPcfId] = useState<string>(
-    currentCell?.pcfId?.toString() || ""
-  );
-
-  const filteredPcfs = useMemo(() => {
-    if (!hierarchy || !selectedGroupId) return [];
-    return hierarchy.pcfs.filter(p => p.groupId === Number(selectedGroupId));
-  }, [hierarchy, selectedGroupId]);
-
-  const filteredCells = useMemo(() => {
-    if (!hierarchy) return [];
-    if (isCellLeader) return hierarchy.cells.filter(c => c.id === user.cellId);
-    if (selectedPcfId) return hierarchy.cells.filter(c => c.pcfId === Number(selectedPcfId));
-    if (isPcfLeader) return hierarchy.cells.filter(c => c.pcfId === user.pcfId);
-    return [];
-  }, [hierarchy, selectedPcfId, isCellLeader, isPcfLeader, user]);
 
   const onSubmit = (data: InsertMember) => {
     mutate({ id: member.id, ...data }, {
@@ -820,291 +808,9 @@ function EditMemberDialog({ member }: { member: any }) {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="title"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Title</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select title" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="Pastor">Pastor</SelectItem>
-                        <SelectItem value="Deacon">Deacon</SelectItem>
-                        <SelectItem value="Deaconess">Deaconess</SelectItem>
-                        <SelectItem value="Brother">Brother</SelectItem>
-                        <SelectItem value="Sister">Sister</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="designation"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Designation</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value || "MEMBER"}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select designation" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {designations.map(d => (
-                          <SelectItem key={d} value={d}>{d.replace('_', ' ')}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <FormField
-              control={form.control}
-              name="fullName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Full Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email Address</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="john@example.com" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input placeholder="+1234567890" {...field} value={field.value || ''} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <FormLabel>Birthday</FormLabel>
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="birthDay"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Day" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {days.map(d => (
-                            <SelectItem key={d} value={d.toString()}>{d}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="birthMonth"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Select onValueChange={field.onChange} value={field.value || ""}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Month" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {months.map(m => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </FormItem>
-                  )}
-                />
-              </div>
-            </div>
-
-            <FormField
-              control={form.control}
-              name="gender"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Gender</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select gender" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Male">Male</SelectItem>
-                      <SelectItem value="Female">Female</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || "Active"}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="space-y-4 p-4 bg-muted/30 rounded-lg border border-border/50">
-              <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Placement</h4>
-              
-              {!isGroupPastor && !isPcfLeader && !isCellLeader && (
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Group</Label>
-                    <Select value={selectedGroupId} onValueChange={(val) => {
-                      setSelectedGroupId(val);
-                      setSelectedPcfId("");
-                      form.setValue("cellId", undefined as any);
-                    }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select Group" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {hierarchy?.groups.map(g => (
-                          <SelectItem key={g.id} value={g.id.toString()}>{g.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">PCF</Label>
-                    <Select value={selectedPcfId} onValueChange={(val) => {
-                      setSelectedPcfId(val);
-                      form.setValue("cellId", undefined as any);
-                    }}>
-                      <SelectTrigger disabled={!selectedGroupId}>
-                        <SelectValue placeholder="Select PCF" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {filteredPcfs.map(p => (
-                          <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              )}
-
-              {isGroupPastor && (
-                <div className="space-y-2">
-                  <Label className="text-xs">Group: {hierarchy?.groups.find(g => g.id === user.groupId)?.name}</Label>
-                  <Select value={selectedPcfId} onValueChange={(val) => {
-                    setSelectedPcfId(val);
-                    form.setValue("cellId", undefined as any);
-                  }}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select PCF" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {hierarchy?.pcfs.filter(p => p.groupId === user.groupId).map(p => (
-                        <SelectItem key={p.id} value={p.id.toString()}>{p.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {isPcfLeader && (
-                <div className="space-y-2">
-                  <Label className="text-xs">PCF: {hierarchy?.pcfs.find(p => p.id === user.pcfId)?.name}</Label>
-                </div>
-              )}
-
-              <FormField
-                control={form.control}
-                name="cellId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-xs">Cell Group</FormLabel>
-                    <Select onValueChange={(val) => field.onChange(Number(val))} value={field.value?.toString() || ""}>
-                      <FormControl>
-                        <SelectTrigger disabled={!isCellLeader && !selectedPcfId && !isPcfLeader}>
-                          <SelectValue placeholder="Select Cell" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {filteredCells.map((cell) => (
-                          <SelectItem key={cell.id} value={cell.id.toString()}>
-                            {cell.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <DialogFooter className="mt-6">
-              <Button type="submit" disabled={isPending}>
-                {isPending ? "Updating..." : "Update Member"}
-              </Button>
-            </DialogFooter>
+            <MemberForm form={form} isPending={isPending} isEdit />
           </form>
         </Form>
       </DialogContent>
     </Dialog>
-  );
-}
+  }
