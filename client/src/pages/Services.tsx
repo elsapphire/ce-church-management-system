@@ -175,6 +175,7 @@ function AddServiceDialog() {
                       <Input 
                         type="number" 
                         {...field} 
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
@@ -192,14 +193,14 @@ function AddServiceDialog() {
                       <Input 
                         type="number" 
                         {...field} 
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(Number(e.target.value))}
                       />
                     </FormControl>
                     <FormMessage />
-                  </FormMessage>
-                </FormItem>
-              )}
-            />
+                  </FormItem>
+                )}
+              />
             </div>
 
             <DialogFooter className="mt-6">
