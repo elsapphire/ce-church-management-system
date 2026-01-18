@@ -60,8 +60,6 @@ export const services = pgTable("services", {
   date: timestamp("date").notNull(),
   startTime: text("start_time").notNull(), // HH:MM
   endTime: text("end_time").notNull(),   // HH:MM
-  price: integer("price").default(0),
-  costToDeliver: integer("cost_to_deliver").default(0),
   active: boolean("active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });

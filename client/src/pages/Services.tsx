@@ -74,8 +74,6 @@ function AddServiceDialog() {
       date: new Date(),
       startTime: "09:00",
       endTime: "11:00",
-      price: 0,
-      costToDeliver: 0,
       active: true,
     },
   });
@@ -157,45 +155,6 @@ function AddServiceDialog() {
                     <FormLabel>End Time</FormLabel>
                     <FormControl>
                       <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="price"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value ?? 0}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="costToDeliver"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cost to Deliver</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="number" 
-                        {...field} 
-                        value={field.value ?? 0}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
-                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
