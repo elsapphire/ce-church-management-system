@@ -93,6 +93,11 @@ export default function Members() {
 
   // Frontend filtering since backend only supports search and cellId
   const filteredMembers = members?.filter(member => {
+    // Basic search filtering
+    if (search && !member.fullName.toLowerCase().includes(search.toLowerCase())) {
+      return false;
+    }
+
     const cell = hierarchy?.cells.find(c => c.id === member.cellId);
     const pcf = hierarchy?.pcfs.find(p => p.id === cell?.pcfId);
     const group = hierarchy?.groups.find(g => g.id === pcf?.groupId);
@@ -800,6 +805,11 @@ function AddMemberDialog() {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             <MemberForm form={form} isPending={isPending} />
+            <DialogFooter className="mt-6">
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Creating..." : "Create Member"}
+              </Button>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>
@@ -863,6 +873,11 @@ function EditMemberDialog({ member }: { member: any }) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
             <MemberForm form={form} isPending={isPending} isEdit />
+            <DialogFooter className="mt-6">
+              <Button type="submit" disabled={isPending}>
+                {isPending ? "Updating..." : "Update Member"}
+              </Button>
+            </DialogFooter>
           </form>
         </Form>
       </DialogContent>
