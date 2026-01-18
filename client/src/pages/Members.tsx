@@ -737,11 +737,24 @@ function AddMemberDialog() {
   });
 
   const onSubmit = (data: InsertMember) => {
-    mutate(data, {
+    // Sanitize empty strings to null for backend
+    const sanitizedData = {
+      ...data,
+      email: data.email?.trim() === "" ? null : data.email,
+      phone: data.phone?.trim() === "" ? null : data.phone,
+    };
+    mutate(sanitizedData, {
       onSuccess: () => {
         setOpen(false);
         form.reset();
       },
+      onError: (err: any) => {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to create member",
+          variant: "destructive",
+        });
+      }
     });
   };
 
@@ -788,10 +801,23 @@ function EditMemberDialog({ member }: { member: any }) {
   });
 
   const onSubmit = (data: InsertMember) => {
-    mutate({ id: member.id, ...data }, {
+    // Sanitize empty strings to null for backend
+    const sanitizedData = {
+      ...data,
+      email: data.email?.trim() === "" ? null : data.email,
+      phone: data.phone?.trim() === "" ? null : data.phone,
+    };
+    mutate({ id: member.id, ...sanitizedData }, {
       onSuccess: () => {
         setOpen(false);
       },
+      onError: (err: any) => {
+        toast({
+          title: "Error",
+          description: err.message || "Failed to update member",
+          variant: "destructive",
+        });
+      }
     });
   };
 
