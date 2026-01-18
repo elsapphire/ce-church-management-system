@@ -39,7 +39,7 @@ function LeaderCombobox({
     if (!members) return [];
     
     const items = members.map(m => {
-      const linkedUser = users?.find(u => u.memberId === m.id);
+      const linkedUser = users?.find(u => u.memberId === m.id || (m.email && u.email.toLowerCase() === m.email.toLowerCase()));
       return {
         ...m,
         isUser: !!linkedUser,
@@ -161,14 +161,14 @@ export default function Structure() {
   const handleGroupLeaderChange = (member: any) => {
     setSelectedGroupMember(member);
     setCreateGroupUser(false);
-    setUserEmail(member.email || "");
+    setUserEmail(member?.email || "");
     setUserPassword("");
   };
 
   const handlePcfLeaderChange = (member: any) => {
     setSelectedPcfMember(member);
     setCreatePcfUser(false);
-    setPcfUserEmail(member.email || "");
+    setPcfUserEmail(member?.email || "");
     setPcfUserPassword("");
   };
 

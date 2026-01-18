@@ -214,23 +214,21 @@ export async function registerRoutes(
     
     let assignedLeaderId = leaderId;
 
-    // 1. Handle User Creation if requested
-    if (createUser) {
-      if (!userEmail || !userPassword) {
-        return res.status(400).json({ message: "Email and password are required for user creation" });
-      }
-      
-      const existingUser = await storage.getUserByEmail(userEmail);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already in use" });
-      }
+    // Handle Idempotent User Management
+    if (memberId) {
+      const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
+      const existingUserByEmail = userEmail ? await storage.getUserByEmail(userEmail) : null;
+      const user = existingUserByMember || existingUserByEmail;
 
-      if (memberId) {
-        const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
-        if (existingUserByMember) {
-          return res.status(400).json({ message: "This member already has a user account" });
+      if (user) {
+        assignedLeaderId = user.id;
+        // If they already have a user, ensure it's linked correctly even if createUser wasn't checked
+        // but we prioritize existing account
+      } else if (createUser) {
+        if (!userEmail || !userPassword) {
+          return res.status(400).json({ message: "Email and password are required for user creation" });
         }
-
+        
         const member = await storage.getMember(Number(memberId));
         if (!member) {
           return res.status(404).json({ message: "Selected member not found" });
@@ -247,23 +245,25 @@ export async function registerRoutes(
           forcePasswordChange: true
         });
         assignedLeaderId = newUser.id;
-      } else {
-        return res.status(400).json({ message: "Member selection is required to create a user" });
       }
     }
     
-    // 2. Validate leader assignment
+    // Validate leader assignment
     const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
     if (!leaderValidation.valid) {
       return res.status(400).json({ message: leaderValidation.error });
     }
     
-    // 3. Create Group
+    // Create Group
     const group = await storage.createGroup({ ...groupData, leaderId: assignedLeaderId });
 
-    // 4. Update user linkage if we assigned an existing or new user
+    // Update user linkage and role
     if (assignedLeaderId) {
-      await storage.updateUser(assignedLeaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+      await storage.updateUser(assignedLeaderId, { 
+        role: UserRoles.GROUP_PASTOR, 
+        groupId: group.id,
+        memberId: memberId ? Number(memberId) : undefined 
+      });
     }
 
     res.status(201).json(group);
@@ -287,23 +287,19 @@ export async function registerRoutes(
     
     let assignedLeaderId = leaderId;
 
-    // 1. Handle User Creation if requested
-    if (createUser) {
-      if (!userEmail || !userPassword) {
-        return res.status(400).json({ message: "Email and password are required for user creation" });
-      }
-      
-      const existingUser = await storage.getUserByEmail(userEmail);
-      if (existingUser) {
-        return res.status(400).json({ message: "Email already in use" });
-      }
+    // Handle Idempotent User Management
+    if (memberId) {
+      const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
+      const existingUserByEmail = userEmail ? await storage.getUserByEmail(userEmail) : null;
+      const user = existingUserByMember || existingUserByEmail;
 
-      if (memberId) {
-        const existingUserByMember = await storage.getUserByMemberId(Number(memberId));
-        if (existingUserByMember) {
-          return res.status(400).json({ message: "This member already has a user account" });
+      if (user) {
+        assignedLeaderId = user.id;
+      } else if (createUser) {
+        if (!userEmail || !userPassword) {
+          return res.status(400).json({ message: "Email and password are required for user creation" });
         }
-
+        
         const member = await storage.getMember(Number(memberId));
         if (!member) {
           return res.status(404).json({ message: "Selected member not found" });
@@ -320,26 +316,25 @@ export async function registerRoutes(
           forcePasswordChange: true
         });
         assignedLeaderId = newUser.id;
-      } else {
-        return res.status(400).json({ message: "Member selection is required to create a user" });
       }
     }
     
-    // 2. Validate leader assignment
+    // Validate leader assignment
     const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
     if (!leaderValidation.valid) {
       return res.status(400).json({ message: leaderValidation.error });
     }
     
-    // 3. Create PCF
+    // Create PCF
     const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId: assignedLeaderId });
 
-    // 4. Update user linkage if we assigned an existing or new user
+    // Update user linkage
     if (assignedLeaderId) {
       await storage.updateUser(assignedLeaderId, { 
         role: userRole || UserRoles.PCF_LEADER, 
         pcfId: pcf.id, 
-        groupId 
+        groupId,
+        memberId: memberId ? Number(memberId) : undefined
       });
     }
 
@@ -368,15 +363,26 @@ export async function registerRoutes(
       return res.status(403).json({ message: "You do not have permission to create cells" });
     }
     
+    let assignedLeaderId = leaderId;
+    if (memberId && !assignedLeaderId) {
+      const user = await storage.getUserByMemberId(Number(memberId));
+      if (user) assignedLeaderId = user.id;
+    }
+
     // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(leaderId);
+    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
     if (!leaderValidation.valid) {
       return res.status(400).json({ message: leaderValidation.error });
     }
     
-    const cell = await storage.createCell({ ...cellData, pcfId, leaderId });
-    if (leaderId) {
-      await storage.updateUser(leaderId, { role: UserRoles.CELL_LEADER, cellId: cell.id, pcfId });
+    const cell = await storage.createCell({ ...cellData, pcfId, leaderId: assignedLeaderId });
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { 
+        role: UserRoles.CELL_LEADER, 
+        cellId: cell.id, 
+        pcfId,
+        memberId: memberId ? Number(memberId) : undefined
+      });
     }
     res.status(201).json(cell);
   });
