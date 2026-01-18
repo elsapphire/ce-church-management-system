@@ -813,4 +813,5 @@ function EditMemberDialog({ member }: { member: any }) {
         </Form>
       </DialogContent>
     </Dialog>
-  }
+  );
+}
