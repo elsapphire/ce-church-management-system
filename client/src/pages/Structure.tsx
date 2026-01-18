@@ -191,8 +191,8 @@ function EditModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Edit {type.toUpperCase()}</DialogTitle>
-          <DialogDescription>Update name and leadership for this {type}.</DialogDescription>
+          <DialogTitle>Edit {(type ?? 'Item').toUpperCase()}</DialogTitle>
+          <DialogDescription>Update name and leadership for this {type ?? 'item'}.</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">
