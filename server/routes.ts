@@ -181,11 +181,15 @@ export async function registerRoutes(
       
       const member = await storage.createMember(input);
       res.status(201).json(member);
-    } catch (err) {
+    } catch (err: any) {
       if (err instanceof z.ZodError) {
         return res.status(400).json({ message: err.errors[0].message });
       }
-      throw err;
+      if (err.message === "A member with this email already exists") {
+        return res.status(400).json({ message: err.message });
+      }
+      console.error("Member creation error:", err);
+      res.status(500).json({ message: "An internal server error occurred" });
     }
   });
 
@@ -194,7 +198,10 @@ export async function registerRoutes(
         const input = api.members.update.input.parse(req.body);
         const member = await storage.updateMember(Number(req.params.id), input);
         res.json(member);
-    } catch (err) {
+    } catch (err: any) {
+        if (err.message === "A member with this email already exists") {
+          return res.status(400).json({ message: err.message });
+        }
         res.status(400).json({ message: "Invalid update" });
     }
   });

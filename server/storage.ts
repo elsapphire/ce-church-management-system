@@ -183,12 +183,47 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createMember(member: InsertMember): Promise<Member> {
-    const [m] = await db.insert(members).values(member).returning();
+    const sanitized = {
+      ...member,
+      email: member.email && member.email.trim() !== "" ? member.email.trim() : null,
+      phone: member.phone && member.phone.trim() !== "" ? member.phone.trim() : null,
+    };
+
+    // Explicitly check uniqueness for non-null emails to provide a better error
+    if (sanitized.email) {
+      const [existing] = await db.select().from(members).where(eq(members.email, sanitized.email)).limit(1);
+      if (existing) {
+        throw new Error("A member with this email already exists");
+      }
+    }
+
+    const [m] = await db.insert(members).values(sanitized).returning();
     return m;
   }
 
   async updateMember(id: number, updates: Partial<InsertMember>): Promise<Member> {
-    const [updated] = await db.update(members).set(updates).where(eq(members.id, id)).returning();
+    const sanitized = { ...updates };
+    if (sanitized.email !== undefined) {
+      sanitized.email = sanitized.email && sanitized.email.trim() !== "" ? sanitized.email.trim() : null;
+      
+      // Check uniqueness if email is being updated to a non-null value
+      if (sanitized.email) {
+        const [existing] = await db.select().from(members).where(
+          and(
+            eq(members.email, sanitized.email),
+            sql`${members.id} != ${id}`
+          )
+        ).limit(1);
+        if (existing) {
+          throw new Error("A member with this email already exists");
+        }
+      }
+    }
+    if (sanitized.phone !== undefined) {
+      sanitized.phone = sanitized.phone && sanitized.phone.trim() !== "" ? sanitized.phone.trim() : null;
+    }
+
+    const [updated] = await db.update(members).set(sanitized).where(eq(members.id, id)).returning();
     return updated;
   }
 
