@@ -459,8 +459,8 @@ export async function registerRoutes(
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     
     // Demote old leader if changed
-    if (existingPcf.leaderId && existingPcf.leaderId !== leaderId) {
-      const oldLeader = await storage.getMember(existingPcf.leaderId);
+    if (existingPcf.leaderId && Number(existingPcf.leaderId) !== Number(leaderId)) {
+      const oldLeader = await storage.getMember(Number(existingPcf.leaderId));
       if (oldLeader && oldLeader.designation === "PCF_LEADER") {
         await storage.updateMember(oldLeader.id, { designation: "MEMBER" });
         const oldUser = await storage.getUserByMemberId(oldLeader.id);
@@ -470,14 +470,14 @@ export async function registerRoutes(
       }
     }
 
-    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId });
+    const pcf = await storage.updatePcf(pcfId, { ...pcfData, leaderId: leaderId ? Number(leaderId) : null });
 
     // Promote new leader
     if (leaderId) {
-      const leaderMember = await storage.getMember(leaderId);
+      const leaderMember = await storage.getMember(Number(leaderId));
       if (leaderMember) {
-        await storage.updateMember(leaderId, { designation: "PCF_LEADER" as any });
-        const leaderUser = await storage.getUserByMemberId(leaderId);
+        await storage.updateMember(Number(leaderId), { designation: "PCF_LEADER" as any });
+        const leaderUser = await storage.getUserByMemberId(Number(leaderId));
         if (leaderUser) {
           await storage.updateUser(leaderUser.id, { 
             role: UserRoles.PCF_LEADER, 
@@ -535,7 +535,7 @@ export async function registerRoutes(
 
       const userId = req.user?.id;
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
-      const user = await storage.getUser(userId);
+      const user = await storage.getUser(String(userId));
       if (!user) return res.status(404).json({ message: "User not found" });
 
       const isMatch = await bcrypt.compare(currentPassword, user.password);
