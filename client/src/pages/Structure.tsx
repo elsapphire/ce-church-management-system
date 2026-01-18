@@ -178,9 +178,9 @@ export default function Structure() {
 
   const accessibleGroups = useMemo(() => {
     if (!hierarchy) return [];
-    if (isAdmin) return hierarchy.groups;
+    if (isAdmin) return hierarchy.groups || [];
     if (isGroupPastor && user?.groupId) {
-      return hierarchy.groups.filter(g => g.id === user.groupId);
+      return (hierarchy.groups || []).filter(g => g.id === user.groupId);
     }
     return [];
   }, [hierarchy, isAdmin, isGroupPastor, user]);
@@ -225,7 +225,14 @@ export default function Structure() {
   }, [isPcfLeader, user]);
 
   const handleAddGroup = async () => {
-    if (!groupName || !hierarchy?.church?.id) return;
+    if (!groupName || !hierarchy?.church?.id) {
+      toast({ 
+        title: "Validation Error", 
+        description: "Group name and Church ID are required. Please ensure a Church is configured.", 
+        variant: "destructive" 
+      });
+      return;
+    }
     setIsPending(true);
     try {
       await apiRequest("POST", "/api/admin/groups", { 
@@ -457,7 +464,12 @@ export default function Structure() {
                     </div>
                   )}
 
-                  <Button className="w-full" onClick={handleAddGroup} disabled={isPending || !groupName} data-testid="button-add-group">
+                  <Button 
+                    className="w-full" 
+                    onClick={handleAddGroup} 
+                    disabled={isPending || !groupName} 
+                    data-testid="button-add-group"
+                  >
                     <Plus className="w-4 h-4 mr-2" /> Add Group
                   </Button>
                 </CardContent>
@@ -632,7 +644,12 @@ export default function Structure() {
                     </div>
                   )}
 
-                  <Button className="w-full" onClick={handleAddPcf} disabled={isPending || !pcfName || !selectedGroupId} data-testid="button-add-pcf">
+                  <Button 
+                    className="w-full" 
+                    onClick={handleAddPcf} 
+                    disabled={isPending || !pcfName || !selectedGroupId} 
+                    data-testid="button-add-pcf"
+                  >
                     <Plus className="w-4 h-4 mr-2" /> Add PCF
                   </Button>
                 </CardContent>
