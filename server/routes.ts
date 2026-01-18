@@ -366,12 +366,44 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
-  app.delete("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
+  app.delete("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
+    const role = req.user?.role;
+    if (role !== UserRoles.ADMIN && role !== UserRoles.GROUP_PASTOR) {
+      return res.status(403).json({ message: "Only Zonal Pastor and Group Pastor can delete PCFs" });
+    }
+    
+    if (role === UserRoles.GROUP_PASTOR) {
+      const pcf = await storage.getPcf(Number(req.params.id));
+      if (!pcf || pcf.groupId !== req.user?.groupId) {
+        return res.status(403).json({ message: "You can only delete PCFs in your own group" });
+      }
+    }
+
     await storage.deletePcf(Number(req.params.id));
     res.status(204).send();
   });
 
-  app.delete("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
+  app.delete("/api/admin/cells/:id", requireAuth, async (req, res) => {
+    const role = req.user?.role;
+    const allowedRoles = [UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER];
+    if (!allowedRoles.includes(role as any)) {
+      return res.status(403).json({ message: "Insufficient permissions to delete cells" });
+    }
+
+    if (role === UserRoles.GROUP_PASTOR) {
+      const cell = await storage.getCell(Number(req.params.id));
+      if (!cell) return res.status(404).json({ message: "Cell not found" });
+      const pcf = await storage.getPcf(cell.pcfId);
+      if (!pcf || pcf.groupId !== req.user?.groupId) {
+        return res.status(403).json({ message: "You can only delete cells in your own group" });
+      }
+    } else if (role === UserRoles.PCF_LEADER) {
+      const cell = await storage.getCell(Number(req.params.id));
+      if (!cell || cell.pcfId !== req.user?.pcfId) {
+        return res.status(403).json({ message: "You can only delete cells in your own PCF" });
+      }
+    }
+
     await storage.deleteCell(Number(req.params.id));
     res.status(204).send();
   });
@@ -409,7 +441,19 @@ export async function registerRoutes(
     res.json(group);
   });
 
-  app.patch("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
+  app.patch("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
+    const role = req.user?.role;
+    if (role !== UserRoles.ADMIN && role !== UserRoles.GROUP_PASTOR) {
+      return res.status(403).json({ message: "Only Zonal Pastor and Group Pastor can edit PCFs" });
+    }
+
+    if (role === UserRoles.GROUP_PASTOR) {
+      const pcf = await storage.getPcf(Number(req.params.id));
+      if (!pcf || pcf.groupId !== req.user?.groupId) {
+        return res.status(403).json({ message: "You can only edit PCFs in your own group" });
+      }
+    }
+
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
     let assignedLeaderId = leaderId;
 
@@ -442,7 +486,27 @@ export async function registerRoutes(
     res.json(pcf);
   });
 
-  app.patch("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
+  app.patch("/api/admin/cells/:id", requireAuth, async (req, res) => {
+    const role = req.user?.role;
+    const allowedRoles = [UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER];
+    if (!allowedRoles.includes(role as any)) {
+      return res.status(403).json({ message: "Insufficient permissions to edit cells" });
+    }
+
+    if (role === UserRoles.GROUP_PASTOR) {
+      const cell = await storage.getCell(Number(req.params.id));
+      if (!cell) return res.status(404).json({ message: "Cell not found" });
+      const pcf = await storage.getPcf(cell.pcfId);
+      if (!pcf || pcf.groupId !== req.user?.groupId) {
+        return res.status(403).json({ message: "You can only edit cells in your own group" });
+      }
+    } else if (role === UserRoles.PCF_LEADER) {
+      const cell = await storage.getCell(Number(req.params.id));
+      if (!cell || cell.pcfId !== req.user?.pcfId) {
+        return res.status(403).json({ message: "You can only edit cells in your own PCF" });
+      }
+    }
+
     const { leaderId, memberId, ...cellData } = req.body;
     let assignedLeaderId = leaderId;
     if (memberId && !assignedLeaderId) {
