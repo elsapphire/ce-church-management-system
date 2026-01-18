@@ -222,7 +222,11 @@ export async function registerRoutes(
         const input = api.services.create.input.parse(req.body);
         const service = await storage.createService(input);
         res.status(201).json(service);
-    } catch (err) {
+    } catch (err: any) {
+        if (err instanceof z.ZodError) {
+          return res.status(400).json({ message: err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') });
+        }
+        console.error("Service creation error:", err);
         res.status(400).json({ message: "Invalid service data" });
     }
   });
