@@ -1,0 +1,66 @@
+Fix the Group Creation flow so that selecting a member and creating a user correctly assigns the Group Pastor and creates the user.
+
+Current bug:
+- Admin selects a member as Group Pastor
+- Checks “Create user account for this member”
+- Group is created BUT:
+  - The member is NOT assigned as group pastor
+  - The user account is NOT created
+
+Required fixes:
+
+1. Group creation must follow this strict order of operations (single flow):
+
+   a. Validate selectedMember exists
+   b. If createUser === true AND selectedMember.isUser === false:
+      - Create a new user account FIRST
+      - Use:
+        - email from selectedMember.email
+        - password provided by admin
+        - role = "group_pastor"
+        - memberId = selectedMember.id
+      - Capture the newly created userId
+
+   c. Create the Group using:
+      - groupPastorMemberId = selectedMember.id
+      - groupPastorUserId = newly created userId (if created)
+      - OR existing userId if member was already a user
+
+2. If selectedMember is already a user:
+   - Do NOT create a new user
+   - Use the existing userId when assigning group pastor
+
+3. Backend must enforce:
+   - One user per member (unique constraint on memberId)
+   - One group pastor per group
+
+4. Frontend submission logic (Structure.tsx):
+   - Must send the following explicitly in the payload:
+     - selectedMemberId
+     - createUser (boolean)
+     - email (only if createUser === true)
+     - password (only if createUser === true)
+     - role = "group_pastor"
+
+5. Backend API (group creation endpoint):
+   - Must NOT assume user already exists
+   - Must handle user creation + group creation atomically
+   - If user creation fails, group creation must NOT proceed
+
+6. After successful creation:
+   - Group hierarchy API must immediately reflect:
+     - Assigned group pastor
+     - Correct member → user linkage
+
+7. Fix any missing awaits, conditional skips, or early returns causing:
+   - User creation to be skipped
+   - Group pastor assignment to be lost
+
+8. Ensure:
+   - No silent failures
+   - Proper error messages returned to frontend if user creation fails
+   - App compiles and runs without crashing
+
+Do NOT refactor unrelated code.
+Do NOT switch modes.
+Fix only the broken group creation logic.

@@ -212,7 +212,9 @@ export async function registerRoutes(
     }
     const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
     
-    // Validate user creation data if requested
+    let assignedLeaderId = leaderId;
+
+    // 1. Handle User Creation if requested
     if (createUser) {
       if (!userEmail || !userPassword) {
         return res.status(400).json({ message: "Email and password are required for user creation" });
@@ -228,40 +230,42 @@ export async function registerRoutes(
         if (existingUserByMember) {
           return res.status(400).json({ message: "This member already has a user account" });
         }
-      }
 
-      // Restrict role assignment: Group Pastor cannot create Admin
-      if (req.user?.role === UserRoles.GROUP_PASTOR && userRole === UserRoles.ADMIN) {
-        return res.status(403).json({ message: "Group Pastors cannot assign Zonal Pastor role" });
-      }
-    }
-    
-    // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(leaderId);
-    if (!leaderValidation.valid) {
-      return res.status(400).json({ message: leaderValidation.error });
-    }
-    
-    const group = await storage.createGroup({ ...groupData, leaderId });
+        const member = await storage.getMember(Number(memberId));
+        if (!member) {
+          return res.status(404).json({ message: "Selected member not found" });
+        }
 
-    if (createUser && memberId) {
-      const member = await storage.getMember(Number(memberId));
-      if (member) {
         const hashedPassword = await bcrypt.hash(userPassword, 10);
-        await storage.createUser({
+        const newUser = await storage.createUser({
           email: userEmail,
           password: hashedPassword,
           role: UserRoles.GROUP_PASTOR,
           firstName: member.fullName.split(' ')[0],
           lastName: member.fullName.split(' ').slice(1).join(' '),
           memberId: member.id,
-          forcePasswordChange: true,
-          groupId: group.id
+          forcePasswordChange: true
         });
+        assignedLeaderId = newUser.id;
+      } else {
+        return res.status(400).json({ message: "Member selection is required to create a user" });
       }
-    } else if (leaderId) {
-      await storage.updateUser(leaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
     }
+    
+    // 2. Validate leader assignment
+    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
+    if (!leaderValidation.valid) {
+      return res.status(400).json({ message: leaderValidation.error });
+    }
+    
+    // 3. Create Group
+    const group = await storage.createGroup({ ...groupData, leaderId: assignedLeaderId });
+
+    // 4. Update user linkage if we assigned an existing or new user
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+    }
+
     res.status(201).json(group);
   });
 
@@ -281,7 +285,9 @@ export async function registerRoutes(
       return res.status(403).json({ message: "You do not have permission to create PCFs" });
     }
     
-    // Validate user creation data if requested
+    let assignedLeaderId = leaderId;
+
+    // 1. Handle User Creation if requested
     if (createUser) {
       if (!userEmail || !userPassword) {
         return res.status(400).json({ message: "Email and password are required for user creation" });
@@ -297,41 +303,46 @@ export async function registerRoutes(
         if (existingUserByMember) {
           return res.status(400).json({ message: "This member already has a user account" });
         }
-      }
 
-      // Restrict role assignment
-      if (role === UserRoles.GROUP_PASTOR && userRole === UserRoles.ADMIN) {
-        return res.status(403).json({ message: "Group Pastors cannot assign Admin role" });
-      }
-    }
-    
-    // Validate leader assignment
-    const leaderValidation = await validateLeaderAssignment(leaderId);
-    if (!leaderValidation.valid) {
-      return res.status(400).json({ message: leaderValidation.error });
-    }
-    
-    const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId });
+        const member = await storage.getMember(Number(memberId));
+        if (!member) {
+          return res.status(404).json({ message: "Selected member not found" });
+        }
 
-    if (createUser && memberId) {
-      const member = await storage.getMember(Number(memberId));
-      if (member) {
         const hashedPassword = await bcrypt.hash(userPassword, 10);
-        await storage.createUser({
+        const newUser = await storage.createUser({
           email: userEmail,
           password: hashedPassword,
           role: userRole || UserRoles.PCF_LEADER,
           firstName: member.fullName.split(' ')[0],
           lastName: member.fullName.split(' ').slice(1).join(' '),
           memberId: member.id,
-          forcePasswordChange: true,
-          groupId,
-          pcfId: pcf.id
+          forcePasswordChange: true
         });
+        assignedLeaderId = newUser.id;
+      } else {
+        return res.status(400).json({ message: "Member selection is required to create a user" });
       }
-    } else if (leaderId) {
-      await storage.updateUser(leaderId, { role: UserRoles.PCF_LEADER, pcfId: pcf.id, groupId });
     }
+    
+    // 2. Validate leader assignment
+    const leaderValidation = await validateLeaderAssignment(assignedLeaderId);
+    if (!leaderValidation.valid) {
+      return res.status(400).json({ message: leaderValidation.error });
+    }
+    
+    // 3. Create PCF
+    const pcf = await storage.createPcf({ ...pcfData, groupId, leaderId: assignedLeaderId });
+
+    // 4. Update user linkage if we assigned an existing or new user
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { 
+        role: userRole || UserRoles.PCF_LEADER, 
+        pcfId: pcf.id, 
+        groupId 
+      });
+    }
+
     res.status(201).json(pcf);
   });
 

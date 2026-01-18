@@ -225,10 +225,10 @@ export default function Structure() {
   }, [isPcfLeader, user]);
 
   const handleAddGroup = async () => {
-    if (!groupName || !hierarchy?.church?.id) {
+    if (!groupName || !hierarchy?.church?.id || !selectedGroupMember) {
       toast({ 
         title: "Validation Error", 
-        description: "Group name and Church ID are required. Please ensure a Church is configured in the system.", 
+        description: "Group name, Church, and Group Pastor selection are required.", 
         variant: "destructive" 
       });
       return;
@@ -239,11 +239,11 @@ export default function Structure() {
         name: groupName, 
         churchId: hierarchy.church.id,
         leaderId: selectedGroupMember?.isUser ? selectedGroupMember.userId : undefined,
+        memberId: selectedGroupMember?.id,
         createUser: createGroupUser,
         userEmail: createGroupUser ? userEmail : undefined,
         userPassword: createGroupUser ? userPassword : undefined,
-        userRole: createGroupUser ? userRole : undefined,
-        memberId: selectedGroupMember?.id
+        userRole: "group_pastor"
       });
       toast({ title: "Success", description: "Group added successfully" });
       setGroupName("");
@@ -261,18 +261,25 @@ export default function Structure() {
   };
 
   const handleAddPcf = async () => {
-    if (!pcfName || !selectedGroupId) return;
+    if (!pcfName || !selectedGroupId || !selectedPcfMember) {
+      toast({ 
+        title: "Validation Error", 
+        description: "PCF name, Parent Group, and PCF Leader selection are required.", 
+        variant: "destructive" 
+      });
+      return;
+    }
     setIsPending(true);
     try {
       await apiRequest("POST", "/api/admin/pcfs", { 
         name: pcfName, 
         groupId: Number(selectedGroupId),
         leaderId: selectedPcfMember?.isUser ? selectedPcfMember.userId : undefined,
+        memberId: selectedPcfMember?.id,
         createUser: createPcfUser,
         userEmail: createPcfUser ? pcfUserEmail : undefined,
         userPassword: createPcfUser ? pcfUserPassword : undefined,
-        userRole: createPcfUser ? pcfUserRole : undefined,
-        memberId: selectedPcfMember?.id
+        userRole: pcfUserRole
       });
       toast({ title: "Success", description: "PCF added successfully" });
       setPcfName("");
@@ -474,7 +481,7 @@ export default function Structure() {
                   <Button 
                     className="w-full" 
                     onClick={handleAddGroup} 
-                    disabled={isPending || !groupName} 
+                    disabled={isPending || !groupName || !selectedGroupMember} 
                     data-testid="button-add-group"
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add Group
@@ -654,7 +661,7 @@ export default function Structure() {
                   <Button 
                     className="w-full" 
                     onClick={handleAddPcf} 
-                    disabled={isPending || !pcfName || !selectedGroupId} 
+                    disabled={isPending || !pcfName || !selectedGroupId || !selectedPcfMember} 
                     data-testid="button-add-pcf"
                   >
                     <Plus className="w-4 h-4 mr-2" /> Add PCF
