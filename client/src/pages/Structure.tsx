@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo, useEffect } from "react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Network, Layers, Home, Search, UserCircle, Trash2, Mail, Lock, Shield } from "lucide-react";
+import { Plus, Network, Layers, Home, Search, UserCircle, Trash2, Mail, Lock, Shield, Edit2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,6 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useMembers } from "@/hooks/use-members";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 
 function LeaderCombobox({ 
   value, 
@@ -103,7 +104,7 @@ function LeaderCombobox({
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">User</Badge>
                       )}
                     </div>
-                    <span className="text-xs text-muted-foreground">{item.email || "No email"}</span>
+                    <span className="text-xs text-muted-foreground">{item.designation} | {item.email || "No email"}</span>
                   </div>
                 </CommandItem>
               ))}
@@ -112,6 +113,124 @@ function LeaderCombobox({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function EditModal({ 
+  type, 
+  entity, 
+  open, 
+  onOpenChange, 
+  onSuccess 
+}: { 
+  type: 'group' | 'pcf' | 'cell'; 
+  entity: any; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void; 
+  onSuccess: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [selectedMember, setSelectedMember] = useState<any>(null);
+  const [createUser, setCreateUser] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isPending, setIsPending] = useState(false);
+  const { toast } = useToast();
+  const { data: members } = useMembers();
+  const { data: users } = useUsers();
+
+  useEffect(() => {
+    if (entity) {
+      setName(entity.name);
+      const leaderIdStr = entity.leaderId?.toString();
+      const member = members?.find(m => m.id.toString() === leaderIdStr);
+      if (member) {
+        const user = users?.find(u => u.id === leaderIdStr || u.memberId === member.id);
+        setSelectedMember({ ...member, isUser: !!user, userId: user?.id });
+      } else {
+        setSelectedMember(null);
+      }
+    }
+  }, [entity, members, users]);
+
+  const handleLeaderChange = (member: any) => {
+    setSelectedMember(member);
+    setCreateUser(false);
+    setEmail(member?.email || "");
+    setPassword("");
+  };
+
+  const handleUpdate = async () => {
+    if (!name || !selectedMember) {
+      toast({ title: "Validation Error", description: "Name and Leader selection are required.", variant: "destructive" });
+      return;
+    }
+    setIsPending(true);
+    try {
+      const endpoint = `/api/admin/${type}s/${entity.id}`;
+      await apiRequest("PATCH", endpoint, { 
+        name, 
+        leaderId: selectedMember?.isUser ? selectedMember.userId : undefined,
+        memberId: selectedMember?.id,
+        createUser,
+        userEmail: createUser ? email : undefined,
+        userPassword: createUser ? password : undefined,
+        userRole: type === 'group' ? 'group_pastor' : type === 'pcf' ? 'pcf_leader' : 'cell_leader'
+      });
+      toast({ title: "Success", description: `${type.toUpperCase()} updated successfully` });
+      onSuccess();
+      onOpenChange(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message || `Failed to update ${type}`, variant: "destructive" });
+    } finally {
+      setIsPending(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle>Edit {type.toUpperCase()}</DialogTitle>
+          <DialogDescription>Update name and leadership for this {type}.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label>Name</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Leader</Label>
+            <LeaderCombobox
+              value={selectedMember?.id?.toString() || ""}
+              onValueChange={handleLeaderChange}
+              placeholder="Select Leader..."
+            />
+          </div>
+          {selectedMember && !selectedMember.isUser && (
+            <div className="flex items-center space-x-2 pt-2">
+              <Checkbox id="edit-create-user" checked={createUser} onCheckedChange={(c) => setCreateUser(c === true)} />
+              <Label htmlFor="edit-create-user">Create user account for this member?</Label>
+            </div>
+          )}
+          {createUser && (
+            <div className="space-y-3 pt-2 border-t">
+              <div className="space-y-2">
+                <Label className="text-xs">Email</Label>
+                <Input value={email} onChange={(e) => setEmail(e.target.value)} className="h-8" />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">Temporary Password</Label>
+                <Input value={password} onChange={(e) => setPassword(e.target.value)} className="h-8" />
+              </div>
+            </div>
+          )}
+        </div>
+        <DialogFooter>
+          <Button onClick={handleUpdate} disabled={isPending}>Save Changes</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -145,6 +264,10 @@ export default function Structure() {
   const [cellName, setCellName] = useState("");
   const [selectedPcfId, setSelectedPcfId] = useState<string>("");
   const [selectedCellMember, setSelectedCellMember] = useState<any>(null);
+
+  const [editEntity, setEditEntity] = useState<any>(null);
+  const [editType, setEditType] = useState<'group' | 'pcf' | 'cell' | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   useEffect(() => {
     if (selectedGroupMember?.isUser) {
@@ -510,18 +633,35 @@ export default function Structure() {
                           <TableCell className="text-muted-foreground">{getLeaderName((g as any).leaderId)}</TableCell>
                           <TableCell>{hierarchy.pcfs.filter(p => p.groupId === g.id).length}</TableCell>
                           <TableCell>
-                            {isAdmin && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => handleDelete('groups', g.id)}
-                                disabled={isPending}
-                                data-testid={`button-delete-group-${g.id}`}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center gap-1">
+                              {isAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setEditEntity(g);
+                                    setEditType('group');
+                                    setIsEditModalOpen(true);
+                                  }}
+                                  data-testid={`button-edit-group-${g.id}`}
+                                >
+                                  <Edit2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {isAdmin && (
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => handleDelete('groups', g.id)}
+                                  disabled={isPending}
+                                  data-testid={`button-delete-group-${g.id}`}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -694,18 +834,35 @@ export default function Structure() {
                             <TableCell className="text-muted-foreground">{group?.name || 'Unknown'}</TableCell>
                             <TableCell>{hierarchy?.cells.filter(c => c.pcfId === p.id).length}</TableCell>
                             <TableCell>
-                              {(isAdmin || isGroupPastor) && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => handleDelete('pcfs', p.id)}
-                                  disabled={isPending}
-                                  data-testid={`button-delete-pcf-${p.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {(isAdmin || (isGroupPastor && p.groupId === user?.groupId)) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      setEditEntity(p);
+                                      setEditType('pcf');
+                                      setIsEditModalOpen(true);
+                                    }}
+                                    data-testid={`button-edit-pcf-${p.id}`}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {(isAdmin || (isGroupPastor && p.groupId === user?.groupId)) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDelete('pcfs', p.id)}
+                                    disabled={isPending}
+                                    data-testid={`button-delete-pcf-${p.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -798,18 +955,35 @@ export default function Structure() {
                             <TableCell className="text-muted-foreground">{getLeaderName((c as any).leaderId)}</TableCell>
                             <TableCell className="text-muted-foreground">{pcf?.name || 'Unknown'}</TableCell>
                             <TableCell>
-                              {(isAdmin || isGroupPastor || isPcfLeader) && (
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => handleDelete('cells', c.id)}
-                                  disabled={isPending}
-                                  data-testid={`button-delete-cell-${c.id}`}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {(isAdmin || (isGroupPastor && pcf?.groupId === user?.groupId) || (isPcfLeader && c.pcfId === user?.pcfId)) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8"
+                                    onClick={() => {
+                                      setEditEntity(c);
+                                      setEditType('cell');
+                                      setIsEditModalOpen(true);
+                                    }}
+                                    data-testid={`button-edit-cell-${c.id}`}
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {(isAdmin || (isGroupPastor && pcf?.groupId === user?.groupId) || (isPcfLeader && c.pcfId === user?.pcfId)) && (
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                    onClick={() => handleDelete('cells', c.id)}
+                                    disabled={isPending}
+                                    data-testid={`button-delete-cell-${c.id}`}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         );
@@ -829,6 +1003,17 @@ export default function Structure() {
           </TabsContent>
         )}
       </Tabs>
+
+      <EditModal
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        type={editType!}
+        entity={editEntity}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["/api/hierarchy"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/users"] });
+        }}
+      />
     </Layout>
   );
 }

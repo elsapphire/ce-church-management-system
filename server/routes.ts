@@ -376,6 +376,86 @@ export async function registerRoutes(
     res.status(204).send();
   });
 
+  app.patch("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
+    const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...groupData } = req.body;
+    let assignedLeaderId = leaderId;
+
+    if (memberId && createUser) {
+      const existingUser = await storage.getUserByMemberId(Number(memberId));
+      if (!existingUser) {
+        const member = await storage.getMember(Number(memberId));
+        if (member) {
+          const hashedPassword = await bcrypt.hash(userPassword, 10);
+          const newUser = await storage.createUser({
+            email: userEmail,
+            password: hashedPassword,
+            role: UserRoles.GROUP_PASTOR,
+            firstName: member.fullName.split(' ')[0],
+            lastName: member.fullName.split(' ').slice(1).join(' '),
+            memberId: member.id,
+            forcePasswordChange: true
+          });
+          assignedLeaderId = newUser.id;
+        }
+      } else {
+        assignedLeaderId = existingUser.id;
+      }
+    }
+
+    const group = await storage.updateGroup(Number(req.params.id), { ...groupData, leaderId: assignedLeaderId });
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { role: UserRoles.GROUP_PASTOR, groupId: group.id });
+    }
+    res.json(group);
+  });
+
+  app.patch("/api/admin/pcfs/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR] as any), async (req, res) => {
+    const { leaderId, memberId, createUser, userEmail, userPassword, userRole, ...pcfData } = req.body;
+    let assignedLeaderId = leaderId;
+
+    if (memberId && createUser) {
+      const existingUser = await storage.getUserByMemberId(Number(memberId));
+      if (!existingUser) {
+        const member = await storage.getMember(Number(memberId));
+        if (member) {
+          const hashedPassword = await bcrypt.hash(userPassword, 10);
+          const newUser = await storage.createUser({
+            email: userEmail,
+            password: hashedPassword,
+            role: userRole || UserRoles.PCF_LEADER,
+            firstName: member.fullName.split(' ')[0],
+            lastName: member.fullName.split(' ').slice(1).join(' '),
+            memberId: member.id,
+            forcePasswordChange: true
+          });
+          assignedLeaderId = newUser.id;
+        }
+      } else {
+        assignedLeaderId = existingUser.id;
+      }
+    }
+
+    const pcf = await storage.updatePcf(Number(req.params.id), { ...pcfData, leaderId: assignedLeaderId });
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { role: userRole || UserRoles.PCF_LEADER, pcfId: pcf.id });
+    }
+    res.json(pcf);
+  });
+
+  app.patch("/api/admin/cells/:id", requireAuth, requireRoles([UserRoles.ADMIN, UserRoles.GROUP_PASTOR, UserRoles.PCF_LEADER] as any), async (req, res) => {
+    const { leaderId, memberId, ...cellData } = req.body;
+    let assignedLeaderId = leaderId;
+    if (memberId && !assignedLeaderId) {
+      const user = await storage.getUserByMemberId(Number(memberId));
+      if (user) assignedLeaderId = user.id;
+    }
+    const cell = await storage.updateCell(Number(req.params.id), { ...cellData, leaderId: assignedLeaderId });
+    if (assignedLeaderId) {
+      await storage.updateUser(assignedLeaderId, { role: UserRoles.CELL_LEADER, cellId: cell.id });
+    }
+    res.json(cell);
+  });
+
   app.post("/api/user/change-password", requireAuth, async (req, res) => {
     try {
       const { currentPassword, newPassword } = req.body;

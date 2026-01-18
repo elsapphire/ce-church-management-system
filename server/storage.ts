@@ -27,6 +27,9 @@ export interface IStorage {
   getCells(pcfId: number): Promise<Cell[]>;
   getAllCells(): Promise<Cell[]>; // Helper
   createCell(cell: any): Promise<Cell>;
+  updateGroup(id: number, updates: Partial<Group>): Promise<Group>;
+  updatePcf(id: number, updates: Partial<Pcf>): Promise<Pcf>;
+  updateCell(id: number, updates: Partial<Cell>): Promise<Cell>;
   deleteGroup(id: number): Promise<void>;
   deletePcf(id: number): Promise<void>;
   deleteCell(id: number): Promise<void>;
@@ -116,6 +119,21 @@ export class DatabaseStorage implements IStorage {
   async createCell(cell: any): Promise<Cell> {
     const [c] = await db.insert(cells).values(cell).returning();
     return c;
+  }
+
+  async updateGroup(id: number, updates: Partial<Group>): Promise<Group> {
+    const [updated] = await db.update(groups).set(updates).where(eq(groups.id, id)).returning();
+    return updated;
+  }
+
+  async updatePcf(id: number, updates: Partial<Pcf>): Promise<Pcf> {
+    const [updated] = await db.update(pcfs).set(updates).where(eq(pcfs.id, id)).returning();
+    return updated;
+  }
+
+  async updateCell(id: number, updates: Partial<Cell>): Promise<Cell> {
+    const [updated] = await db.update(cells).set(updates).where(eq(cells.id, id)).returning();
+    return updated;
   }
 
   async deleteGroup(id: number): Promise<void> {
