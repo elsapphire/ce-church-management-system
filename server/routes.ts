@@ -698,9 +698,9 @@ export async function registerRoutes(
         forcePasswordChange: false
       });
 
-      res.json({ message: "Password updated successfully" });
+      return res.json({ message: "Password updated successfully" });
     } catch (err) {
-      res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
@@ -738,9 +738,9 @@ export async function registerRoutes(
         forcePasswordChange: true,
       });
 
-      res.status(201).json(user);
+      return res.status(201).json(user);
     } catch (err) {
-      res.status(500).json({ message: "Internal server error" });
+      return res.status(500).json({ message: "Internal server error" });
     }
   });
 
