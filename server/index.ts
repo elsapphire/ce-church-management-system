@@ -64,11 +64,13 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+    if (res.headersSent) {
+      return _next(err);
+    }
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
-    res.status(status).json({ message });
-    return;
+    return res.status(status).json({ message });
   });
 
   // importantly only setup vite in development and after

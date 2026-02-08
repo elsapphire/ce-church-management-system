@@ -461,7 +461,7 @@ export async function registerRoutes(
 
   app.delete("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
     await storage.deleteGroup(Number(req.params.id));
-    return res.status(204).send();
+    return res.status(204).end();
   });
 
   app.delete("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
@@ -478,7 +478,7 @@ export async function registerRoutes(
     }
 
     await storage.deletePcf(Number(req.params.id));
-    return res.status(204).send();
+    return res.status(204).end();
   });
 
   app.delete("/api/admin/cells/:id", requireAuth, async (req, res) => {
@@ -502,7 +502,7 @@ export async function registerRoutes(
     }
 
     await storage.deleteCell(Number(req.params.id));
-    return res.status(204).send();
+    return res.status(204).end();
   });
 
   app.patch("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {

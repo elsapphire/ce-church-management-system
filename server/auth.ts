@@ -57,7 +57,7 @@ export function getSession() {
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     pool: pool,
-    createTableIfMissing: false,
+    createTableIfMissing: true,
     ttl: sessionTtl,
     tableName: "sessions",
   });
@@ -130,7 +130,7 @@ export function setupLocalAuth(app: Express) {
   });
 
   app.post("/api/auth/logout", (req, res) => {
-    req.session.destroy((err) => {
+    return req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Failed to logout" });
       }
