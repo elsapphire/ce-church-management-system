@@ -57,6 +57,9 @@ export function getSession() {
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
+    ssl: {
+      rejectUnauthorized: false,
+    },
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
@@ -122,10 +125,10 @@ export function setupLocalAuth(app: Express) {
 
       const { password: _, ...userWithoutPassword } = user;
       console.info("[auth] user session validated");
-      res.json({ user: userWithoutPassword });
+      return res.json({ user: userWithoutPassword });
     } catch (error) {
       console.error("Login error:", error);
-      res.status(500).json({ message: "An error occurred during login" });
+      return res.status(500).json({ message: "An error occurred during login" });
     }
   });
 
@@ -135,7 +138,7 @@ export function setupLocalAuth(app: Express) {
         return res.status(500).json({ message: "Failed to logout" });
       }
       res.clearCookie("connect.sid");
-      res.json({ message: "Logged out successfully" });
+      return res.json({ message: "Logged out successfully" });
     });
   });
 
@@ -151,7 +154,7 @@ export function setupLocalAuth(app: Express) {
     }
 
     const { password: _, ...userWithoutPassword } = user;
-    res.json(userWithoutPassword);
+    return res.json(userWithoutPassword);
   });
 }
 

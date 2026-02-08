@@ -113,7 +113,7 @@ export async function registerRoutes(
     const allCells = [];
     for (const p of allPcfs) allCells.push(...await storage.getCells(p.id));
 
-    res.json({
+    return res.json({
         church,
         groups,
         pcfs: allPcfs,
@@ -133,7 +133,7 @@ export async function registerRoutes(
     const filteredMembers = allMembers.filter(m => 
       m.cellId && accessibleCellIds.includes(m.cellId)
     );
-    res.json(filteredMembers);
+    return res.json(filteredMembers);
   });
 
   app.get(api.members.get.path, requireAuth, async (req, res) => {
@@ -147,7 +147,7 @@ export async function registerRoutes(
       }
     }
     
-    res.json(member);
+    return res.json(member);
   });
 
   app.post(api.members.create.path, requireAuth, async (req, res) => {
@@ -184,7 +184,7 @@ export async function registerRoutes(
       }
       
       const member = await storage.createMember(input);
-      res.status(201).json(member);
+      return res.status(201).json(member);
     } catch (err: any) {
       console.error("Member creation error detail:", err);
       if (err instanceof z.ZodError) {
@@ -194,7 +194,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: err.message });
       }
       console.error("Member creation error:", err);
-      res.status(500).json({ message: "An internal server error occurred" });
+      return res.status(500).json({ message: "An internal server error occurred" });
     }
   });
 
@@ -205,37 +205,37 @@ export async function registerRoutes(
           email: req.body.email?.trim() || null
         });
         const member = await storage.updateMember(Number(req.params.id), input);
-        res.json(member);
+        return res.json(member);
     } catch (err: any) {
         if (err.message === "A member with this email already exists") {
           return res.status(400).json({ message: err.message });
         }
-        res.status(400).json({ message: "Invalid update" });
+        return res.status(400).json({ message: "Invalid update" });
     }
   });
 
   app.delete(api.members.delete.path, requireAuth, async (req, res) => {
     await storage.deleteMember(Number(req.params.id));
-    res.status(204).send();
+    return res.status(204).send();
   });
 
   // === SERVICES ===
   app.get(api.services.list.path, requireAuth, async (req, res) => {
     const services = await storage.getServices();
-    res.json(services);
+    return res.json(services);
   });
 
   app.post(api.services.create.path, requireAuth, async (req, res) => {
     try {
         const input = api.services.create.input.parse(req.body);
         const service = await storage.createService(input);
-        res.status(201).json(service);
+        return res.status(201).json(service);
     } catch (err: any) {
         if (err instanceof z.ZodError) {
           return res.status(400).json({ message: err.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ') });
         }
         console.error("Service creation error:", err);
-        res.status(400).json({ message: "Invalid service data" });
+        return res.status(400).json({ message: "Invalid service data" });
     }
   });
 
@@ -243,9 +243,9 @@ export async function registerRoutes(
     try {
         const input = api.services.update.input.parse(req.body);
         const service = await storage.updateService(Number(req.params.id), input);
-        res.json(service);
+        return res.json(service);
     } catch (err) {
-        res.status(400).json({ message: "Invalid update" });
+        return res.status(400).json({ message: "Invalid update" });
     }
   });
 
@@ -254,9 +254,9 @@ export async function registerRoutes(
     try {
         const input = api.attendance.mark.input.parse(req.body);
         const record = await storage.markAttendance(input);
-        res.status(201).json(record);
+        return res.status(201).json(record);
     } catch (err) {
-        res.status(400).json({ message: "Invalid attendance data" });
+        return res.status(400).json({ message: "Invalid attendance data" });
     }
   });
 
@@ -264,13 +264,13 @@ export async function registerRoutes(
     const serviceId = Number(req.query.serviceId);
     if (!serviceId) return res.status(400).json({ message: "serviceId required" });
     const records = await storage.getAttendanceForService(serviceId);
-    res.json(records);
+    return res.json(records);
   });
 
   app.get(api.attendance.stats.path, requireAuth, async (req, res) => {
     const serviceId = req.query.serviceId ? Number(req.query.serviceId) : undefined;
     const stats = await storage.getAttendanceStats(serviceId);
-    res.json(stats);
+    return res.json(stats);
   });
 
   // === USERS (for leader selection dropdowns) ===
@@ -284,7 +284,7 @@ export async function registerRoutes(
       title: u.title,
       role: u.role,
     }));
-    res.json(safeUsers);
+    return res.json(safeUsers);
   });
 
   // Structure: Leader selection validation (REMOVED generic check)
@@ -350,7 +350,7 @@ export async function registerRoutes(
       });
     }
 
-    res.status(201).json(group);
+    return res.status(201).json(group);
   });
 
   // PCFs: Admin or Group Pastor (within their group)
@@ -416,7 +416,7 @@ export async function registerRoutes(
       });
     }
 
-    res.status(201).json(pcf);
+    return res.status(201).json(pcf);
   });
 
   // Cells: Admin, Group Pastor (in their group), PCF Leader (in their PCF)
@@ -456,12 +456,12 @@ export async function registerRoutes(
         memberId: memberId ? Number(memberId) : undefined
       });
     }
-    res.status(201).json(cell);
+    return res.status(201).json(cell);
   });
 
   app.delete("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
     await storage.deleteGroup(Number(req.params.id));
-    res.status(204).send();
+    return res.status(204).send();
   });
 
   app.delete("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
@@ -478,7 +478,7 @@ export async function registerRoutes(
     }
 
     await storage.deletePcf(Number(req.params.id));
-    res.status(204).send();
+    return res.status(204).send();
   });
 
   app.delete("/api/admin/cells/:id", requireAuth, async (req, res) => {
@@ -502,7 +502,7 @@ export async function registerRoutes(
     }
 
     await storage.deleteCell(Number(req.params.id));
-    res.status(204).send();
+    return res.status(204).send();
   });
 
   app.patch("/api/admin/groups/:id", requireAuth, requireRoles(UserRoles.ADMIN), async (req, res) => {
@@ -544,7 +544,7 @@ export async function registerRoutes(
       response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
     }
     
-    res.json(response);
+    return res.json(response);
   });
 
   app.patch("/api/admin/pcfs/:id", requireAuth, async (req, res) => {
@@ -672,7 +672,7 @@ export async function registerRoutes(
       response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
     }
     
-    res.json(response);
+    return res.json(response);
   });
 
   app.post("/api/user/change-password", requireAuth, async (req, res) => {
