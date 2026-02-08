@@ -1,0 +1,52 @@
+Here’s a Fast Mode prompt you can send to Replit to fix both errors in your church management system project:
+
+⸻
+
+Fast Mode Prompt:
+
+We have an Express + PostgreSQL project deployed on Replit. The following issues occur:
+	1.	Error [ERR_HTTP_HEADERS_SENT]: Cannot set headers after they are sent to the client
+	•	This happens when routes call res.json() or res.send() multiple times.
+	•	Fix: Ensure all res calls are preceded with return and no route or async callback sends multiple responses. Catch blocks should return after sending errors.
+	2.	error: SSL/TLS required from connect-pg-simple session store
+	•	Fix: Enable SSL in the PostgreSQL Pool and pass it to the session store. Use ssl: { rejectUnauthorized: false } for hosted Postgres.
+
+Required changes:
+	•	Update all routes in server/index.ts (especially around line 45–70) to use return res.json(...) or return res.status(...). Ensure next(err) or catch blocks do not trigger additional responses.
+	•	Modify the PostgreSQL pool creation:
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false },
+});
+
+	•	Pass the pool to connect-pg-simple session store:
+
+app.use(
+  session({
+    store: new (require('connect-pg-simple')(session))({
+      pool: pool,
+      tableName: 'session',
+    }),
+    secret: process.env.SESSION_SECRET!,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 30 * 24 * 60 * 60 * 1000 },
+  })
+);
+
+	•	Ensure DATABASE_URL is correctly set in Replit secrets.
+	•	Audit all async route handlers to prevent multiple res calls.
+
+Goal:
+	•	Fix ERR_HTTP_HEADERS_SENT by preventing multiple responses.
+	•	Fix PostgreSQL SSL errors so sessions and queries work on hosted database.
+	•	Maintain existing functionality; do not break current authentication or other routes.
+
+Deliver a ready-to-run version with both issues fixed.
+
+⸻
+
+If you want, I can also tighten this prompt even further to make Replit Fast Mode auto-patch the index.ts and session setup in one shot. This usually works reliably.
+
+Do you want me to do that?
