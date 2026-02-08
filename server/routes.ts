@@ -76,7 +76,7 @@ async function resolveLeaderUser(leaderId: string | number | null | undefined): 
   const newUser = await storage.createUser({
     email,
     password: hashedPassword,
-    role: UserRoles.MEMBER as UserRole,
+    role: UserRoles.MEMBER,
     firstName: member.fullName.split(' ')[0],
     lastName: member.fullName.split(' ').slice(1).join(' ') || '',
     memberId: member.id,
@@ -520,7 +520,7 @@ export async function registerRoutes(
     if (oldLeaderId && oldLeaderId !== newLeaderId) {
       const oldUser = await storage.getUser(oldLeaderId);
       if (oldUser && oldUser.role === UserRoles.GROUP_PASTOR) {
-        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, groupId: null });
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER, groupId: null });
         if (oldUser.memberId) {
           await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
         }
@@ -578,7 +578,7 @@ export async function registerRoutes(
     if (oldLeaderId && oldLeaderId !== newLeaderId) {
       const oldUser = await storage.getUser(oldLeaderId);
       if (oldUser && oldUser.role === UserRoles.PCF_LEADER) {
-        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, pcfId: null, groupId: null });
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER, pcfId: null, groupId: null });
         if (oldUser.memberId) {
           await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
         }
@@ -642,7 +642,7 @@ export async function registerRoutes(
     if (oldLeaderId && oldLeaderId !== newLeaderId) {
       const oldUser = await storage.getUser(oldLeaderId);
       if (oldUser && oldUser.role === UserRoles.CELL_LEADER) {
-        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER as UserRole, cellId: null });
+        await storage.updateUser(oldUser.id, { role: UserRoles.MEMBER, cellId: null });
         if (oldUser.memberId) {
           await storage.updateMember(oldUser.memberId, { designation: "MEMBER" });
         }
@@ -669,7 +669,7 @@ export async function registerRoutes(
     // Include credentials if a new user was auto-created
     const response: any = { ...updatedCell };
     if (isNewUser && tempPassword) {
-      response.newLeaderCredentials = { email, tempPassword, mustChangePassword: true };
+      response.newLeaderCredentials = { email: email!, tempPassword, mustChangePassword: true };
     }
     
     return res.json(response);

@@ -10,6 +10,7 @@ export const UserRoles = {
   GROUP_PASTOR: "group_pastor",
   PCF_LEADER: "pcf_leader",
   CELL_LEADER: "cell_leader",
+  MEMBER: "member",
 } as const;
 
 export type UserRole = typeof UserRoles[keyof typeof UserRoles];
