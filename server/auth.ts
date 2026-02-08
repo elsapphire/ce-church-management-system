@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { db, pool } from "./db";
 import { users, type User, loginSchema, type LoginInput } from "@shared/models/auth";
 import { eq, or } from "drizzle-orm";
 import bcrypt from "bcrypt";
@@ -56,10 +56,7 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    ssl: {
-      rejectUnauthorized: false,
-    },
+    pool: pool,
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
