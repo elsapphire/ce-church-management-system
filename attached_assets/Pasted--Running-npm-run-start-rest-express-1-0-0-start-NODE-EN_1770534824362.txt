@@ -1,0 +1,42 @@
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+node:internal/url:1610
+    throw new ERR_INVALID_ARG_TYPE('path', ['string', 'URL'], path);
+    ^
+TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of URL. Received undefined
+    at fileURLToPath (node:internal/url:1610:11)
+    at Object.<anonymous> (/opt/render/project/src/dist/index.cjs:76:128539)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Object..js (node:internal/modules/cjs/loader:1839:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+Node.js v22.22.0
+==> Exited with status 1
+==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+==> Running 'npm run start'
+> rest-express@1.0.0 start
+> NODE_ENV=production node dist/index.cjs
+node:internal/url:1610
+    throw new ERR_INVALID_ARG_TYPE('path', ['string', 'URL'], path);
+    ^
+TypeError [ERR_INVALID_ARG_TYPE]: The "path" argument must be of type string or an instance of URL. Received undefined
+    at fileURLToPath (node:internal/url:1610:11)
+    at Object.<anonymous> (/opt/render/project/src/dist/index.cjs:76:128539)
+    at Module._compile (node:internal/modules/cjs/loader:1706:14)
+    at Object..js (node:internal/modules/cjs/loader:1839:10)
+    at Module.load (node:internal/modules/cjs/loader:1441:32)
+    at Function._load (node:internal/modules/cjs/loader:1263:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+    at node:internal/main/run_main_module:36:49 {
+  code: 'ERR_INVALID_ARG_TYPE'
+}
+Node.js v22.22.0
